@@ -1,0 +1,376 @@
+@import './tokens.css';
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--bb-font-sans);
+  --font-mono: var(--bb-font-mono);
+  --font-display: var(--bb-font-display);
+  --font-hud: var(--bb-font-hud);
+
+  /* Neutrals */
+  --color-bb-ground: var(--bb-ground, #0B0C0E);
+  --color-bb-surface: var(--bb-surface, #16181C);
+  --color-bb-surface-2: var(--bb-surface-2, #1D2026);
+  --color-bb-ink: var(--bb-ink, #F2F2ED);
+  --color-bb-ink-soft: var(--bb-ink-soft, #B4B6B2);
+  --color-bb-ink-faint: var(--bb-ink-faint, #75786F);
+  --color-bb-line: var(--bb-line, rgba(242, 242, 237, 0.14));
+  --color-bb-line-strong: var(--bb-line-strong, rgba(242, 242, 237, 0.30));
+  --color-bb-border-hard: var(--bb-border-hard, #F2F2ED);
+
+  /* Accent */
+  --color-bb-yellow: var(--bb-yellow, #FFD400);
+  --color-bb-yellow-dim: var(--bb-yellow-dim, #E6BF00);
+  --color-bb-yellow-fill: var(--bb-yellow-fill, rgba(255, 212, 0, 0.14));
+
+  /* Status */
+  --color-bb-success: var(--bb-success, #35D46A);
+  --color-bb-danger: var(--bb-danger, #E8362B);
+  --color-bb-warning: var(--bb-warning, #FF9F1C);
+
+  /* Duel identity — narrow exception, see tokens.css */
+  --color-bb-rival: var(--bb-rival, #3AA0FF);
+
+  /* Code register */
+  --color-bb-code-bg: var(--bb-code-bg, #0B0C0E);
+  --color-bb-code-surface: var(--bb-code-surface, #16181C);
+  --color-bb-code-line: var(--bb-code-line, rgba(242, 242, 237, 0.12));
+  --color-bb-code-text: var(--bb-code-text, #F2F2ED);
+  --color-bb-code-acc: var(--bb-code-acc, #FFD400);
+}
+
+@layer base {
+  html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html, body, #app {
+    background-color: var(--bb-ground, #0B0C0E);
+    color: var(--bb-ink, #F2F2ED);
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    width: 100%;
+    font-family: var(--bb-font-sans);
+    overflow-x: hidden;
+    letter-spacing: -0.01em;
+    transition: background-color 0.35s ease, color 0.35s ease;
+  }
+
+  ::selection {
+    background: var(--bb-yellow-fill, rgba(255, 212, 0, 0.14));
+    color: var(--bb-ink, #F2F2ED);
+  }
+
+  h1, h2, h3 {
+    font-family: var(--bb-font-display);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--bb-yellow, #FFD400);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm, 2px);
+  }
+}
+
+/* ─── Scoreboard grid — flat blueprint/pixel-grid texture, app-wide (not a
+   Blitz-only "arena" register any more; the whole app is the theatrical
+   dark register now). ─── */
+.scoreboard-grid {
+  background-image:
+    linear-gradient(var(--bb-grid-line, rgba(242, 242, 237, 0.06)) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bb-grid-line, rgba(242, 242, 237, 0.06)) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(ellipse 85% 65% at 50% 0%, black 30%, transparent 85%);
+  mask-image: radial-gradient(ellipse 85% 65% at 50% 0%, black 30%, transparent 85%);
+}
+
+/* ─── Panel — sharp bordered surface, the Panel primitive's base. ─── */
+.panel {
+  background: var(--bb-surface, #16181C);
+  border: var(--border-default, 1.5px) solid var(--bb-line-strong, rgba(242, 242, 237, 0.30));
+  border-radius: var(--radius-md, 4px);
+}
+.panel-lift {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.panel-lift:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-sticker, 4px 4px 0 var(--bb-border-hard));
+}
+
+/* ─── Bracket frame — broadcast/viewfinder corner marks (currentColor-driven,
+   so it works identically in the app and code registers). Replaces the old
+   delicate print crop-mark motif with a thicker, more "framed monitor" cue,
+   merging what used to be two near-duplicate classes into one. ─── */
+.bracket-frame {
+  position: relative;
+}
+.bracket-frame::before,
+.bracket-frame::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  opacity: 0.8;
+  z-index: 20;
+}
+.bracket-frame::before {
+  top: -2px;
+  left: -2px;
+  border-top: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+}
+.bracket-frame::after {
+  bottom: -2px;
+  right: -2px;
+  border-bottom: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+}
+
+/* ─── Sticker shadows — hard offset shadows, no blur. ─── */
+.shadow-sticker-sm { box-shadow: var(--shadow-sticker-sm); }
+.shadow-sticker { box-shadow: var(--shadow-sticker); }
+.shadow-sticker-lg { box-shadow: var(--shadow-sticker-lg); }
+.shadow-sticker-yellow { box-shadow: var(--shadow-sticker-yellow); }
+.shadow-sticker-success { box-shadow: var(--shadow-sticker-success); }
+.shadow-sticker-danger { box-shadow: var(--shadow-sticker-danger); }
+
+/* ─── Eyebrow — numbered/plain section labels. One merged class (dark is the
+   app default now, so the old paper/terminal eyebrow split is redundant). ─── */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--bb-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bb-yellow, #FFD400);
+}
+.eyebrow-muted {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--bb-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--bb-ink-faint, #75786F);
+}
+
+/* ─── Stat numerals — oversized HUD digits (Orbitron), used for ratings, XP,
+   timers, ranks. The single most visible typographic shift from the old
+   system, which used JetBrains Mono here. ─── */
+.stat-num {
+  font-family: var(--bb-font-hud);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Corner "open/explore" affordance chip — sharp/bracket, not circular. ─── */
+.link-chip {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm, 2px);
+  border: var(--border-default) solid var(--bb-line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bb-ink-faint, #75786F);
+  opacity: 0;
+  transform: translate(-2px, 2px);
+  transition: opacity 0.15s ease, transform 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  pointer-events: none;
+}
+.group:hover .link-chip {
+  opacity: 1;
+  transform: translate(0, 0);
+  color: var(--bb-yellow, #FFD400);
+  border-color: var(--bb-yellow, #FFD400);
+}
+
+/* ─── Hazard stripes — danger-zone motif (end session, destructive actions). ─── */
+.hazard-stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(232, 54, 43, 0.14) 0px,
+    rgba(232, 54, 43, 0.14) 6px,
+    transparent 6px,
+    transparent 14px
+  );
+}
+
+/* ─── CRT scanlines — scoped to the code editor's glass, a legitimate
+   "machine" cue in a register that's always dark. ─── */
+.scanlines {
+  position: relative;
+}
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(242, 242, 237, 0.05) 0px,
+    rgba(242, 242, 237, 0.05) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 20;
+  mix-blend-mode: overlay;
+}
+
+/* ─── Victory sheen — a single diagonal light sweep across a winning stamp. ─── */
+@keyframes sheen-sweep {
+  from { transform: translateX(-150%) skewX(-20deg); }
+  to { transform: translateX(250%) skewX(-20deg); }
+}
+.sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.16) 50%, transparent 70%);
+  animation: sheen-sweep 1.8s ease-in-out 0.3s 1;
+  pointer-events: none;
+}
+
+/* ─── Fail shake — a quick horizontal rattle for a fresh WA/RE/TLE stamp. ─── */
+@keyframes shake-x {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+.animate-shake { animation: shake-x 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+
+/* ─── Inline blinking caret — reads as "live/ready." ─── */
+.caret-inline {
+  display: inline-block;
+  width: 0.5em;
+  border-right: 2px solid currentColor;
+  margin-left: 1px;
+  animation: blink-caret 1s step-end infinite;
+}
+@keyframes blink-caret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.animate-caret { animation: blink-caret 1s step-end infinite; }
+
+/* ─── Live-dot pulse — "running"/"live" indicators. Color comes from the
+   element's own bg-bb-* class; this keyframe only pulses opacity. ─── */
+@keyframes pulse-accent {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.animate-pulse-accent { animation: pulse-accent 2s ease-in-out infinite; }
+
+/* ─── Generic entrance animations ─── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn { animation: fadeIn 0.2s ease-out forwards; }
+
+@keyframes popup {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-popup { animation: popup 0.15s ease-out forwards; }
+
+/* ─── Scrollbar ─── */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: var(--bb-line-strong); border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--bb-ink-faint); }
+.custom-scrollbar-code::-webkit-scrollbar { width: 4px; height: 4px; }
+.custom-scrollbar-code::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar-code::-webkit-scrollbar-thumb { background: rgba(242, 242, 237, 0.14); border-radius: 4px; }
+.custom-scrollbar-code::-webkit-scrollbar-thumb:hover { background: rgba(242, 242, 237, 0.24); }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ─── Syntax highlighting (C++) — code register, theme-constant. Keyword
+   uses the app's one accent; the rest follow common editor convention
+   (strings/success-green, numbers/warning-amber, functions/rival-blue).
+   type/builtin keep narrow, muted syntax-only hues — a legible C++
+   highlighter needs more variety than the brand's one-accent rule allows,
+   same kind of documented exception as RatingBadge. ─── */
+.syntax-keyword { color: var(--bb-yellow); font-weight: 600; }
+.syntax-string { color: var(--bb-success); }
+.syntax-number { color: var(--bb-warning); }
+.syntax-comment { color: var(--bb-ink-faint); font-style: italic; }
+.syntax-function { color: var(--bb-rival); }
+.syntax-type { color: #C4B5FD; }
+.syntax-builtin { color: #F9A8D4; }
+.syntax-preproc { color: var(--bb-ink-faint); opacity: 0.75; }
+
+/* ─── Phase 1 additions ─────────────────────────────────────────────────────
+   Loading, liveness and scroll-affordance utilities used by the module pages.
+   All flat/no-blur, consistent with the sticker-shadow shape language. ─── */
+
+/* Skeleton — a flat opacity breathe, not a shimmer sweep. A gradient sweep
+   would be the only soft/blurred motion in the app and would read as a
+   different design system. */
+@keyframes bb-skeleton {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.8; }
+}
+.skeleton-pulse {
+  animation: bb-skeleton 1.4s ease-in-out infinite;
+}
+
+/* Live dot — the "match in progress" pulse. Uses the rival token, which the
+   design doc reserves for opponent-identity and live cues. */
+@keyframes bb-live {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(0.82); }
+}
+.live-pulse {
+  animation: bb-live 1.2s ease-in-out infinite;
+}
+
+/* Horizontally scrollable filter rails on mobile — the scrollbar itself is
+   noise on a two-row rail, but the overflow must stay scrollable. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Respect reduced-motion for every animation added above, plus the existing
+   panel lift. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-pulse,
+  .live-pulse {
+    animation: none;
+  }
+  .panel-lift {
+    transition: none;
+  }
+  .panel-lift:hover {
+    transform: none;
+  }
+}
+
+/* Global overflow guard — one horizontal-scroll bug on a phone makes the
+   whole site feel broken, so the constraint is enforced at the root rather
+   than component by component. */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}

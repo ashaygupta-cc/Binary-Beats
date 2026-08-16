@@ -1,0 +1,5 @@
+design/
+BinaryBeats-main/
+server/
+*.md
+!README.md
