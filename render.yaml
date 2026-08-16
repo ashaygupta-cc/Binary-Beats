@@ -1,0 +1,38 @@
+# Render Blueprint for the backend only (server/). The frontend deploys to
+# Vercel separately — see DEPLOYMENT.md.
+#
+# Usage: Render dashboard → New → Blueprint → point at this repo. Render reads
+# this file and provisions the service below.
+services:
+  - type: web
+    name: binary-beats-api
+    env: docker
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # set manually: Neon connection string (problem/test dataset)
+      - key: AUTH_DATABASE_URL
+        sync: false # set manually: separate Neon project's connection string (users table only)
+      - key: SESSION_SECRET
+        generateValue: true # Render generates a random 32+ char value
+      - key: GOOGLE_CLIENT_ID
+        sync: false # optional — leave unset to disable Google sign-in
+      - key: WEB_ORIGIN
+        sync: false # set manually: the Vercel frontend origin
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_REDIRECT_URI
+        sync: false # https://<this-service>.onrender.com/api/discord/callback
+      - key: DISCORD_GUILD_ID
+        sync: false
+      - key: BOT_API_URL
+        sync: false # https://<cp-bot-service>.onrender.com
+      - key: BB_API_KEY
+        sync: false # must match the value set on the CP-Bot service

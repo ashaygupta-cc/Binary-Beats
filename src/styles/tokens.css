@@ -1,0 +1,95 @@
+/* Binary Beats — "Scoreboard Brutalism" design tokens.
+   Plain CSS custom properties only (no @theme/Tailwind syntax) so this file
+   works both through src/styles/tailwind.css (Vite app) and as a bare
+   <link> in login.html. This is the single source of truth for color/font
+   values — nothing should re-declare a hex literal outside this file. */
+
+@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=Orbitron:wght@500;600;700;800;900&display=swap');
+
+:root {
+  color-scheme: dark;
+
+  /* Fonts */
+  --bb-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --bb-font-mono: 'JetBrains Mono', 'Menlo', monospace;
+  --bb-font-display: 'Big Shoulders Display', 'Inter', system-ui, sans-serif;
+  --bb-font-hud: 'Orbitron', 'JetBrains Mono', monospace;
+
+  /* Neutrals — dark is the app's default, primary register */
+  --bb-ground: #0B0C0E;
+  --bb-surface: #16181C;
+  --bb-surface-2: #1D2026;
+  --bb-ink: #F2F2ED;
+  --bb-ink-soft: #B4B6B2;
+  --bb-ink-faint: #75786F;
+  --bb-line: rgba(242, 242, 237, 0.14);
+  --bb-line-strong: rgba(242, 242, 237, 0.30);
+  --bb-border-hard: #F2F2ED;
+
+  /* Accent — exactly one loud color, app-wide (including inside code) */
+  --bb-yellow: #FFD400;
+  --bb-yellow-dim: #E6BF00;
+  --bb-yellow-fill: rgba(255, 212, 0, 0.14);
+
+  /* Status — scoreboard traffic lights. Constant across themes: a stadium's
+     colored bulbs don't change with daylight, and a WA/AC verdict shouldn't
+     either. */
+  --bb-success: #35D46A;
+  --bb-danger: #E8362B;
+  --bb-warning: #FF9F1C;
+
+  /* Duel identity — narrow, documented exception (see DESIGN.md). Used only
+     for opponent-identity contexts: rival avatar ring, rival's half of a
+     scoreboard bar, "watching/live" pulse dot. Never a general secondary
+     brand color. */
+  --bb-rival: #3AA0FF;
+
+  /* Code register — the editor/judge console. Theme-constant: code needs a
+     stable dark reading surface regardless of app theme. In dark mode this
+     is identical to the app tokens by design (there's only one dark
+     register now); in light mode it stays fixed while the app around it
+     flips to off-white. */
+  --bb-code-bg: #0B0C0E;
+  --bb-code-surface: #16181C;
+  --bb-code-line: rgba(242, 242, 237, 0.12);
+  --bb-code-text: #F2F2ED;
+  --bb-code-acc: var(--bb-yellow);
+
+  /* Shape — brutalist: sharp corners, thick borders, hard offset shadows,
+     no blur anywhere. */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-pill: 9999px;
+  --border-default: 1.5px;
+  --border-thick: 2px;
+  --shadow-sticker-sm: 2px 2px 0 var(--bb-border-hard);
+  --shadow-sticker: 4px 4px 0 var(--bb-border-hard);
+  --shadow-sticker-lg: 6px 6px 0 var(--bb-border-hard);
+  --shadow-sticker-yellow: 4px 4px 0 var(--bb-yellow);
+  --shadow-sticker-success: 4px 4px 0 var(--bb-success);
+  --shadow-sticker-danger: 4px 4px 0 var(--bb-danger);
+
+  --bb-grid-line: rgba(242, 242, 237, 0.06);
+}
+
+/* Light mode — inverted, for the existing theme toggle. Dark is the
+   default/primary experience; light is the alternate, not the other way
+   around (old system was the reverse). Status colors, accent, and the code
+   register intentionally do NOT change here. */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bb-ground: #F2F2ED;
+  --bb-surface: #FFFFFF;
+  --bb-surface-2: #F0F0EA;
+  --bb-ink: #0E0F11;
+  --bb-ink-soft: #4B4D50;
+  --bb-ink-faint: #84867F;
+  --bb-line: rgba(14, 15, 17, 0.14);
+  --bb-line-strong: rgba(14, 15, 17, 0.32);
+  --bb-border-hard: #0E0F11;
+
+  --bb-rival: #1D6FE0;
+
+  --bb-grid-line: rgba(14, 15, 17, 0.06);
+}

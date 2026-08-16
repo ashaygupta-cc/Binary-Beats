@@ -1,0 +1,48 @@
+{
+  "name": "binary-beats-server",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "check": "tsc --noEmit",
+    "ingest": "tsx src/scripts/ingestProblems.ts",
+    "migrate-sqlite": "tsx src/scripts/migrateFromSqlite.ts",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@koa/bodyparser": "^6.1.0",
+    "@koa/cors": "^5.0.0",
+    "@koa/router": "^15.7.0",
+    "@neondatabase/serverless": "^0.10.4",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^16.5.0",
+    "drizzle-orm": "^0.43.1",
+    "express": "^5.2.1",
+    "google-auth-library": "^10.9.0",
+    "hyparquet": "^1.26.2",
+    "hyparquet-compressors": "^1.1.1",
+    "jsonwebtoken": "^9.0.3",
+    "koa": "^3.2.1",
+    "mongoose": "^9.7.4",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/koa": "^3.0.3",
+    "@types/koa__cors": "^5.0.0",
+    "@types/node": "^24.13.2",
+    "@types/pg": "^8.11.14",
+    "drizzle-kit": "^0.31.1",
+    "tsx": "^4.19.2",
+    "typescript": "~6.0.2"
+  }
+}
