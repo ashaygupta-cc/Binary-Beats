@@ -63,7 +63,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (!params.has("auth")) return;
     if (params.get("auth") === "ok") refresh();
-    window.history.replaceState({}, "", window.location.pathname + window.location.hash);
+    window.history.replaceState({}, "", window.location.pathname);
   }, [refresh]);
 
   const playSound = (type: "click" | "hover") => {
