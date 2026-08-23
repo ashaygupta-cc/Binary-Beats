@@ -46,6 +46,14 @@ function relative(iso: string | null): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function formatDisplayName(name: string | null | undefined): string {
+  if (!name) return "—";
+  if (/^\d+$/.test(name.trim())) {
+    return `User #${name.slice(-4)}`;
+  }
+  return name;
+}
+
 export const CommunityPage: React.FC<Props> = ({ playSound }) => {
   const stats = useBotData(() => botApi.stats(), []);
   const serverUpdates = useBotData(() => discordApi.messages("server_updates", { limit: 10 }), []);
@@ -128,8 +136,8 @@ export const CommunityPage: React.FC<Props> = ({ playSound }) => {
                   <Panel className="flex flex-wrap items-center gap-x-3 gap-y-2 p-4">
                     <Tag tone="neutral" bracket>{m.mode}</Tag>
                     <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-bb-ink">
-                      {m.player1_name ?? "—"} <span className="text-bb-ink-faint">vs</span>{" "}
-                      {m.is_bot_match ? "Bot" : m.player2_name ?? "—"}
+                      {formatDisplayName(m.player1_name)} <span className="text-bb-ink-faint">vs</span>{" "}
+                      {m.is_bot_match ? "Bot" : formatDisplayName(m.player2_name)}
                     </span>
                     <span className="font-mono text-[11px] tabular-nums text-bb-ink-soft">
                       game {m.current_game}/{m.total_games}
