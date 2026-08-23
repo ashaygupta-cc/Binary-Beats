@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Panel } from "../ui/Panel";
 import { Tag } from "../ui/Tag";
+import { PdfViewerModal } from "../ui/PdfViewerModal";
 import type { DiscordMessage, DiscordEmbed, DiscordAttachment } from "../../lib/botApi";
 
 /* Renders a mirrored Discord message as a Binary Beats card — not as a chat
@@ -247,8 +248,10 @@ const EmbedCard: React.FC<{ embed: DiscordEmbed }> = ({ embed }) => {
 
 const Attachments: React.FC<{ files: DiscordAttachment[] }> = ({ files }) => {
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [pdfPreview, setPdfPreview] = useState<DiscordAttachment | null>(null);
   const images = files.filter((f) => f.is_image);
-  const others = files.filter((f) => !f.is_image);
+  const pdfs = files.filter((f) => f.is_pdf);
+  const others = files.filter((f) => !f.is_image && !f.is_pdf);
 
   return (
     <>
@@ -266,6 +269,21 @@ const Attachments: React.FC<{ files: DiscordAttachment[] }> = ({ files }) => {
         </div>
       )}
 
+      {/* PDFs open inline in a viewer modal instead of downloading */}
+      {pdfs.map((f) => (
+        <button
+          key={f.id}
+          onClick={() => setPdfPreview(f)}
+          className="mt-2 flex w-full items-center gap-3 rounded border-[1.5px] border-bb-line-strong bg-bb-surface p-3 text-left transition-colors hover:border-bb-yellow"
+        >
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-bb-yellow">PDF</span>
+          <span className="min-w-0 flex-1 truncate text-[13px] text-bb-ink">{f.filename}</span>
+          <span className="shrink-0 font-mono text-[11px] text-bb-ink-faint">
+            {(f.size / 1024).toFixed(0)} KB
+          </span>
+        </button>
+      ))}
+
       {others.map((f) => (
         <a
           key={f.id}
@@ -275,7 +293,7 @@ const Attachments: React.FC<{ files: DiscordAttachment[] }> = ({ files }) => {
           className="mt-2 flex items-center gap-3 rounded border-[1.5px] border-bb-line-strong bg-bb-surface p-3 transition-colors hover:border-bb-ink"
         >
           <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-bb-yellow">
-            {f.is_pdf ? "PDF" : (f.filename.split(".").pop() ?? "FILE").toUpperCase()}
+            {(f.filename.split(".").pop() ?? "FILE").toUpperCase()}
           </span>
           <span className="min-w-0 flex-1 truncate text-[13px] text-bb-ink">{f.filename}</span>
           <span className="shrink-0 font-mono text-[11px] text-bb-ink-faint">
@@ -292,6 +310,14 @@ const Attachments: React.FC<{ files: DiscordAttachment[] }> = ({ files }) => {
         >
           <img src={lightbox} alt="" className="max-h-[90dvh] max-w-full rounded border-[1.5px] border-bb-line-strong object-contain" />
         </div>
+      )}
+
+      {pdfPreview && (
+        <PdfViewerModal
+          url={pdfPreview.url}
+          filename={pdfPreview.filename}
+          onClose={() => setPdfPreview(null)}
+        />
       )}
     </>
   );

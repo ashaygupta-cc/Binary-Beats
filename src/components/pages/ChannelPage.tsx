@@ -50,13 +50,13 @@ export const ChannelPage: React.FC<Props> = ({ slug, threadId, playSound }) => {
       threads: channel?.view === "article" ? "1" : undefined
     }),
     [channel?.key, search],
-    { enabled: !!channel && channel.view !== "threads" && !threadId }
+    { enabled: !!channel && channel.view !== "threads" && channel.view !== "forum" && !threadId }
   );
 
   const threads = useBotData(
     () => discordApi.threads(channel!.key),
     [channel?.key],
-    { enabled: !!channel && channel.view === "threads" && !threadId }
+    { enabled: !!channel && (channel.view === "threads" || channel.view === "forum") && !threadId }
   );
 
   const thread = useBotData(
@@ -167,8 +167,9 @@ export const ChannelPage: React.FC<Props> = ({ slug, threadId, playSound }) => {
     );
   }
 
-  // ── thread index (daily editorials) ─────────────────────────────
-  if (channel.view === "threads") {
+  // ── thread index (daily editorials, OA questions forum, etc.) ──────
+  if (channel.view === "threads" || channel.view === "forum") {
+    const isForum = channel.view === "forum";
     return (
       <>
         <PageHeader number="—" title={channel.label} blurb={channel.blurb} />
@@ -179,8 +180,8 @@ export const ChannelPage: React.FC<Props> = ({ slug, threadId, playSound }) => {
             isEmpty={(d) => d.threads.length === 0}
             empty={
               <EmptyState
-                title="No editorials synced yet"
-                body="Run !syncchannel daily_editorials in Discord to backfill."
+                title={isForum ? "Nothing synced yet" : "No editorials synced yet"}
+                body={`Run !syncchannel ${channel.key} in Discord to backfill this channel.`}
               />
             }
           >
@@ -194,15 +195,19 @@ export const ChannelPage: React.FC<Props> = ({ slug, threadId, playSound }) => {
                       onKeyDown={(e) => { if (e.key === "Enter") navigate(`c/${channel.slug}/${t.thread_id}`); }}
                       className="flex h-full cursor-pointer flex-col gap-2 p-4"
                     >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Tag tone={t.has_pdf ? "success" : "warning"}>
-                          {t.has_pdf ? "editorial available" : "coming soon"}
-                        </Tag>
-                        {t.is_archived && <Tag tone="neutral">archived</Tag>}
-                      </div>
+                      {!isForum && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Tag tone={t.has_pdf ? "success" : "warning"}>
+                            {t.has_pdf ? "editorial available" : "coming soon"}
+                          </Tag>
+                          {t.is_archived && <Tag tone="neutral">archived</Tag>}
+                        </div>
+                      )}
                       <p className="min-w-0 break-words text-[14px] font-semibold text-bb-ink">{t.name}</p>
                       <p className="mt-auto font-mono text-[11px] text-bb-ink-faint">
-                        {t.editorial_date ?? new Date(t.created_at).toLocaleDateString()} · {t.message_count} posts
+                        {isForum
+                          ? `${t.message_count} ${t.message_count === 1 ? "reply" : "replies"}`
+                          : `${t.editorial_date ?? new Date(t.created_at).toLocaleDateString()} · ${t.message_count} posts`}
                       </p>
                     </Panel>
                   </li>

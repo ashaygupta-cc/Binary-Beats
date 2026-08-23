@@ -7,6 +7,7 @@ import { Panel } from "../ui/Panel";
 import { Button } from "../ui/Button";
 import { Tag } from "../ui/Tag";
 import { Eyebrow } from "../ui/Eyebrow";
+import { PdfViewerModal } from "../ui/PdfViewerModal";
 import { DISCORD_INVITE } from "../../data/site";
 import { ArticleView } from "../renderers/ArticleView";
 import { RoadmapView } from "../renderers/RoadmapView";
@@ -445,6 +446,8 @@ export const CPDSAContentPage: React.FC<Props> = ({ user, gateReason, onLogin, p
     }
   };
 
+  const [editorialPdf, setEditorialPdf] = useState<{ url: string; filename: string } | null>(null);
+
   // ── Data fetching ─────────────────────────────────────────────
   const problems = useBotData(() => botApi.problems({ limit: 60 }), []);
   const oaThreads = useBotData(() => discordApi.threads("oa_questions"), [], { enabled: tab === "oa" });
@@ -660,13 +663,14 @@ export const CPDSAContentPage: React.FC<Props> = ({ user, gateReason, onLogin, p
                       {editorial.data.thread.message_count} posts
                     </p>
                     {editorial.data.files?.filter((f) => f.is_pdf).map((f) => (
-                      <a
-                        key={f.id} href={f.url} target="_blank" rel="noreferrer"
-                        className="mt-2 flex items-center gap-2 rounded border-[1.5px] border-bb-line-strong bg-bb-surface-2 p-2 font-mono text-[11px] text-bb-yellow hover:border-bb-yellow transition-colors"
+                      <button
+                        key={f.id}
+                        onClick={(e) => { e.stopPropagation(); setEditorialPdf({ url: f.url, filename: f.filename }); }}
+                        className="mt-2 flex w-full items-center gap-2 rounded border-[1.5px] border-bb-line-strong bg-bb-surface-2 p-2 font-mono text-[11px] text-bb-yellow hover:border-bb-yellow transition-colors"
                       >
                         <span className="uppercase">PDF</span>
                         <span className="truncate text-bb-ink-soft">{f.filename}</span>
-                      </a>
+                      </button>
                     ))}
                     <Button
                       variant="outline" size="sm" className="mt-3 w-full"
@@ -846,6 +850,14 @@ export const CPDSAContentPage: React.FC<Props> = ({ user, gateReason, onLogin, p
         {/* ── CONTEST CALENDAR TAB ─────────────────────────── */}
         {tab === "contests" && <ContestCalendarView contestsData={contestsData} />}
       </PageBody>
+
+      {editorialPdf && (
+        <PdfViewerModal
+          url={editorialPdf.url}
+          filename={editorialPdf.filename}
+          onClose={() => setEditorialPdf(null)}
+        />
+      )}
     </div>
   );
 };

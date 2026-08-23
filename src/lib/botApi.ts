@@ -290,6 +290,39 @@ export interface EditorialState {
   files?: DiscordAttachment[];
 }
 
+export interface RegisteredHandle {
+  platform: string;
+  handle: string;
+  verified: boolean;
+  linked_at: string;
+}
+
+/** Registered handles for a Discord member, straight from the bot's `handles`
+ *  table — the single source of truth. Used to stop the site's own "link a
+ *  handle" flows from creating a second, disconnected handle string for
+ *  someone who already has one registered via the bot (`!setcf` etc). */
+export const botUserApi = {
+  handles: (discordId: string) =>
+    get<{ user: { discord_id: string; discord_username: string }; handles: RegisteredHandle[] }>(
+      `/users/${discordId}`
+    ).catch(() => ({ user: null as any, handles: [] as RegisteredHandle[] })),
+};
+
+export interface RemoteTeamMember {
+  id: number;
+  name: string;
+  role: string;
+  linkedin_url: string;
+  github_url: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+/** Team roster added at runtime via !team in Discord. */
+export const teamApi = {
+  list: () => get<{ members: RemoteTeamMember[] }>("/team").catch(() => ({ members: [] as RemoteTeamMember[] })),
+};
+
 export const discordApi = {
   channels: () => get<{ channels: { channel_key: string; message_count: number; latest_at: string | null }[] }>("/channels"),
   messages: (key: string, opts?: { limit?: number; before?: string; pinned?: string; q?: string; threads?: string }) =>

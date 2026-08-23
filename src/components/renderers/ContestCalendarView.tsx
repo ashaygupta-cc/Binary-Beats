@@ -147,7 +147,7 @@ export const ContestCalendarView: React.FC<ContestCalendarViewProps> = ({ contes
                 {
                   id: "bb-c2",
                   title: "Binary Beats ICPC Practice Gym",
-                  url: "https://codeforces.com/gyms",
+                  url: "https://codeforces.com/group/hfiI9LqNuy/contests",
                   platform: "Codeforces",
                   start_time: "2026-08-25T17:00:00Z",
                 }

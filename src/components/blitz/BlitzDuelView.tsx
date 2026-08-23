@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useCfHandle } from "../../hooks/useCfHandle";
 import { useSessionPolling } from "../../hooks/useSessionPolling";
@@ -224,6 +224,45 @@ export const BlitzDuelView: React.FC<BlitzDuelViewProps> = ({ playSound }) => {
     }
     setConfirmingEnd(false);
   };
+
+  // ── Forfeit the match if the player leaves without clicking "End Session" ──
+  // Closing the tab, hitting browser back, or navigating to another page in
+  // the app all unmount this component without going through handleEndSession,
+  // which used to leave the session "active" server-side indefinitely (stuck
+  // matchmaking slot, opponent's game never resolves). Keep a ref of the
+  // latest sessionId/session/handle so the unmount cleanup — which only runs
+  // once, with stale closure state otherwise — always sees current values.
+  const liveRef = useRef({ sessionId, session, handle });
+  useEffect(() => {
+    liveRef.current = { sessionId, session, handle };
+  }, [sessionId, session, handle]);
+
+  useEffect(() => {
+    const forfeitIfActive = (keepalive: boolean) => {
+      const { sessionId: sid, session: s, handle: h } = liveRef.current;
+      if (!sid || !s || s.status !== "active") return;
+      try {
+        fetch("/api/bot/duels/forfeit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ duel_id: sid, discord_id: h }),
+          keepalive,
+        }).catch(() => {});
+      } catch {
+        // best-effort — nothing more we can do if the request itself throws
+      }
+    };
+
+    const onBeforeUnload = () => forfeitIfActive(true);
+    window.addEventListener("beforeunload", onBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      // Unmounting for any other reason (SPA route change away from Arena)
+      // while a match is still active — end it so it doesn't hang.
+      forfeitIfActive(true);
+    };
+  }, []);
 
   const handleCopyLinks = async () => {
     if (!session) return;

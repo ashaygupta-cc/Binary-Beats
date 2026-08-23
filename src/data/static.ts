@@ -19,6 +19,8 @@ export interface TeamMember {
   role: string;
   title: string;
   linkedin: string;
+  /** Optional GitHub profile — renders as an icon-only button next to LinkedIn. */
+  github?: string;
   /** Optional — falls back to a monogram avatar. */
   avatarUrl?: string;
   isFounder?: boolean;
