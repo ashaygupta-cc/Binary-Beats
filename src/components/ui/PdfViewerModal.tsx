@@ -1,19 +1,4 @@
-import React, { useEffect, useState } from "react";
-
-/**
- * Inline PDF viewer modal.
- *
- * Why not just `<a href={url} target="_blank">`?
- * Discord CDN attachment URLs are frequently served with
- * `Content-Disposition: attachment`, which makes the browser download the
- * file instead of rendering it — regardless of `target="_blank"`. Pointing
- * an <iframe> straight at that URL has the same problem in Chrome/Edge.
- *
- * The fix: fetch the PDF ourselves, turn it into a same-origin `blob:` URL
- * (blob URLs have no Content-Disposition header at all), and point the
- * <iframe> at that instead. The browser's native PDF viewer then renders it
- * inline no matter how the origin server wanted to serve it.
- */
+import React, { useEffect } from "react";
 
 interface Props {
   url: string;
@@ -22,33 +7,7 @@ interface Props {
 }
 
 export const PdfViewerModal: React.FC<Props> = ({ url, filename, onClose }) => {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    let objectUrl: string | null = null;
-
-    (async () => {
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const blob = await res.blob();
-        objectUrl = URL.createObjectURL(
-          blob.type === "application/pdf" ? blob : new Blob([blob], { type: "application/pdf" })
-        );
-        if (!cancelled) setBlobUrl(objectUrl);
-      } catch {
-        // CORS-blocked or network error — fall back to a direct link below
-        if (!cancelled) setError(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [url]);
+  const googleDocsViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -74,11 +33,19 @@ export const PdfViewerModal: React.FC<Props> = ({ url, filename, onClose }) => {
           >
             Download
           </a>
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded border-[1.5px] border-bb-yellow bg-bb-yellow px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-bb-ground font-bold transition-colors"
+          >
+            Open Tab ↗
+          </a>
           <button
             onClick={onClose}
-            className="rounded border-[1.5px] border-bb-line-strong px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-bb-ink-soft hover:border-bb-yellow hover:text-bb-yellow transition-colors"
+            className="rounded border-[1.5px] border-bb-line-strong px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-bb-ink-soft hover:border-bb-yellow hover:text-bb-yellow transition-colors cursor-pointer"
           >
-            Close
+            Close [ESC]
           </button>
         </div>
       </div>
@@ -87,29 +54,11 @@ export const PdfViewerModal: React.FC<Props> = ({ url, filename, onClose }) => {
         className="min-h-0 flex-1 overflow-hidden rounded border-[1.5px] border-bb-line-strong bg-bb-surface"
         onClick={(e) => e.stopPropagation()}
       >
-        {error ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <p className="text-[13px] text-bb-ink-soft">
-              Couldn't load an inline preview for this file.
-            </p>
-            <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded border-[1.5px] border-bb-line-strong px-4 py-2 font-mono text-[11px] uppercase tracking-wider text-bb-yellow hover:border-bb-yellow transition-colors"
-            >
-              Open in new tab
-            </a>
-          </div>
-        ) : blobUrl ? (
-          <iframe src={blobUrl} title={filename} className="h-full w-full" />
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <span className="font-mono text-[12px] uppercase tracking-wider text-bb-ink-faint">
-              Loading preview…
-            </span>
-          </div>
-        )}
+        <iframe
+          src={googleDocsViewerUrl}
+          title={filename}
+          className="h-full w-full border-0"
+        />
       </div>
     </div>
   );

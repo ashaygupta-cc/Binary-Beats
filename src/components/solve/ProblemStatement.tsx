@@ -243,13 +243,26 @@ export const ProblemStatement: React.FC<ProblemStatementProps> = ({ statement, p
         {/* Platform Metadata Badges */}
         <div className="flex items-center gap-2 flex-wrap">
           {platform.isLc ? (
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-              statement.rating && statement.rating < 1400 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" :
-              statement.rating && statement.rating < 1900 ? "bg-amber-500/10 text-amber-400 border-amber-500/30" :
-              "bg-rose-500/10 text-rose-400 border-rose-500/30"
-            }`}>
-              {statement.rating && statement.rating < 1400 ? "Easy" : statement.rating && statement.rating < 1900 ? "Medium" : "Hard"}
-            </span>
+            <>
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                (statement.difficulty?.toLowerCase() === "easy" || (!statement.difficulty && statement.rating != null && statement.rating < 1400))
+                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                  : (statement.difficulty?.toLowerCase() === "hard" || (!statement.difficulty && statement.rating != null && statement.rating >= 1900))
+                  ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                  : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+              }`}>
+                {statement.difficulty
+                  ? statement.difficulty.charAt(0).toUpperCase() + statement.difficulty.slice(1).toLowerCase()
+                  : (statement.rating != null
+                      ? (statement.rating < 1400 ? "Easy" : statement.rating < 1900 ? "Medium" : "Hard")
+                      : "Easy")}
+              </span>
+              {statement.rating && (
+                <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-bb-ground border border-bb-line text-bb-ink">
+                  {statement.rating}
+                </span>
+              )}
+            </>
           ) : (
             <span className={`px-2.5 py-0.5 rounded font-mono text-xs font-bold border ${cfRank.color}`}>
               {cfRank.rank} {statement.rating ? `(${statement.rating})` : ""}

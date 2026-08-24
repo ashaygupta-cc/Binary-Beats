@@ -81,7 +81,8 @@ export function deriveClaim(session: BlitzSession, key: string): SolveClaim {
 export function dailyProblemToSolvable(p: DailyProblem): SolvableProblem {
   let contestId = 0;
   let index = "";
-  if (p.platform.toLowerCase() === "codeforces") {
+  const isCf = p.platform.toLowerCase() === "codeforces" || p.platform.toLowerCase() === "cf";
+  if (isCf) {
     const m = p.problem_id.match(/^(\d+)([A-Za-z]\d?)$/);
     if (m) {
       contestId = parseInt(m[1]);
@@ -93,7 +94,8 @@ export function dailyProblemToSolvable(p: DailyProblem): SolvableProblem {
     contestId,
     index,
     title: p.title ?? p.problem_id,
-    rating: p.difficulty ? parseInt(p.difficulty) || null : null,
+    rating: isCf && p.difficulty && !isNaN(Number(p.difficulty)) ? Number(p.difficulty) : null,
+    difficulty: p.difficulty || undefined,
     tags: [],
     judgeable: true,
     platform: p.platform.toLowerCase(),

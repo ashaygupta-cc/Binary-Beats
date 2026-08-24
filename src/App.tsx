@@ -170,7 +170,7 @@ export default function App() {
       case "c": {
         const slug = route.segments[1];
         if (!slug) return <CommunityPage playSound={playSound} />;
-        return <ChannelPage slug={slug} threadId={route.segments[2]} playSound={playSound} />;
+        return <ChannelPage slug={slug} threadId={route.segments[2]} playSound={playSound} user={user} />;
       }
 
       case "u": {

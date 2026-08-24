@@ -337,3 +337,28 @@ export const discordApi = {
   checkSubmissions: (discordId: string) =>
     post<{ success: boolean; results: string[]; earned: number }>("/problems/check", { discord_id: discordId }),
 };
+
+export interface AICoachPayload {
+  discord_id?: string;
+  username?: string;
+  current_rating?: string;
+  target_rating?: string;
+  weak_topics?: string[];
+  strong_topics?: string[];
+  daily_time?: string;
+  goal?: string;
+}
+
+export const aiApi = {
+  chat: (payload: { session_id?: string; message: string; current_page?: string; username?: string }) =>
+    post<{ reply: string; navigate?: string; session_id: string }>("/ai/chat", payload),
+  coach: (payload: AICoachPayload) =>
+    post<{ analysis: string }>("/ai/coach", payload),
+  hint: (payload: { problem_id: string }) =>
+    post<{ hints: string }>("/ai/hint", payload),
+  explain: (payload: { topic: string }) =>
+    post<{ guide: string }>("/ai/explain", payload),
+  review: (payload: { code: string }) =>
+    post<{ review: string }>("/ai/review", payload),
+};
+

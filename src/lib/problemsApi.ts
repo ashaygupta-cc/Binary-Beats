@@ -11,6 +11,7 @@ export interface ProblemStatementData {
   index: string;
   title: string | null;
   rating: number | null;
+  difficulty?: string;
   tags: string[];
   timeLimitMs: number | null;
   memoryLimitMb: number | null;

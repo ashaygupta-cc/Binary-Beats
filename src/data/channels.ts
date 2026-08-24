@@ -47,6 +47,11 @@ export const CHANNELS: ChannelDef[] = [
     blurb: "In-house competitions and how to enter them.",
   },
   {
+    key: "daily_problems", id: "1518305550914293942",
+    label: "Daily Problems Threads", slug: "daily-problems", view: "threads", featured: false,
+    blurb: "Daily problem challenge threads and community solution submissions.",
+  },
+  {
     key: "daily_editorials", id: "1520284027008061562",
     label: "Editorials", slug: "editorials", view: "threads", featured: true,
     blurb: "One thread per day, matched to that day's problems.",

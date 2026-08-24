@@ -319,8 +319,13 @@ const MoreProblemsSection: React.FC<MoreProblemsSectionProps> = ({ playSound, on
           problems.map((p, idx) => {
             const keyStr = p.key || p.problem_id || (p.id ? String(p.id) : `prob-${idx}`);
             const platformStr = (p.platform || "").toLowerCase();
-            const platformName = keyStr.startsWith("LC-") || platformStr.includes("lc") || platformStr.includes("leetcode") ? "LeetCode" : "Codeforces";
-            const diff = p.rating != null ? (p.rating < 1200 ? "Easy" : p.rating < 1600 ? "Medium" : "Hard") : (p.difficulty || "Unrated");
+            const isLc = keyStr.startsWith("LC-") || platformStr.includes("lc") || platformStr.includes("leetcode");
+            const platformName = isLc ? "LeetCode" : "Codeforces";
+            
+            // Standard rule: Easy < 1400, Medium < 1900, Hard >= 1900
+            const diff = p.rating != null
+              ? (p.rating < 1400 ? "Easy" : p.rating < 1900 ? "Medium" : "Hard")
+              : (p.difficulty || (isLc ? "Easy" : "Unrated"));
             const diffTone = diff === "Easy" ? "success" : diff === "Medium" ? "warning" : diff === "Hard" ? "danger" : "neutral";
             const tagsList = Array.isArray(p.tags) ? p.tags : [];
             const url = getProblemExternalUrl({
@@ -581,17 +586,23 @@ export const CPDSAContentPage: React.FC<Props> = ({ user, gateReason, onLogin, p
         {/* ── DAILY PROBLEMS TAB ───────────────────────────── */}
         {tab === "problems" && (
           <div className="flex flex-col gap-6">
-            {/* Date navigator */}
+            {/* Date navigator (Strict 1-Month / 30-Day Rolling Limit) */}
             <div className="flex items-center justify-between gap-3">
               <button
-                onClick={() => setDateOffset(dateOffset - 1)}
-                className="flex h-8 w-8 items-center justify-center rounded border-[1.5px] border-bb-line-strong bg-bb-surface font-mono text-bb-ink-soft hover:border-bb-yellow hover:text-bb-yellow transition-colors"
+                onClick={() => { if (dateOffset > -30) setDateOffset(dateOffset - 1); }}
+                disabled={dateOffset <= -30}
+                className={`flex h-8 w-8 items-center justify-center rounded border-[1.5px] border-bb-line-strong bg-bb-surface font-mono transition-colors ${
+                  dateOffset <= -30 ? "text-bb-ink-faint/30 cursor-not-allowed" : "text-bb-ink-soft hover:border-bb-yellow hover:text-bb-yellow"
+                }`}
+                title={dateOffset <= -30 ? "1-Month Archive Limit" : "Previous Day"}
               >‹</button>
               <div className="text-center">
                 <span className="font-display text-lg font-bold uppercase tracking-tight text-bb-ink">
                   {humanDate(selectedDate)}
                 </span>
-                <p className="font-mono text-[10px] text-bb-ink-faint">{selectedDate}</p>
+                <p className="font-mono text-[10px] text-bb-ink-faint">
+                  {selectedDate} {dateOffset <= -30 ? "· 30-DAY RETENTION LIMIT" : ""}
+                </p>
               </div>
               <button
                 onClick={() => { if (dateOffset < 0) setDateOffset(dateOffset + 1); }}
@@ -644,16 +655,7 @@ export const CPDSAContentPage: React.FC<Props> = ({ user, gateReason, onLogin, p
                                   onClick={(e: React.MouseEvent) => {
                                     e.stopPropagation();
                                     playSound?.("click");
-                                    handleOpenProblem({
-                                      key: p.problem_id,
-                                      contestId: 0,
-                                      index: p.problem_id,
-                                      title: p.title || p.problem_id,
-                                      rating: p.points ? p.points * 10 : 800,
-                                      tags: [],
-                                      judgeable: true,
-                                      platform: p.platform.toLowerCase(),
-                                    });
+                                    handleOpenProblem(dailyProblemToSolvable(p));
                                   }}
                                 >
                                   Solve
@@ -673,7 +675,9 @@ export const CPDSAContentPage: React.FC<Props> = ({ user, gateReason, onLogin, p
                 <Eyebrow>Editorial</Eyebrow>
                 {displayedEditorial?.status === "available" && displayedEditorial.thread ? (
                   <Panel className="p-4">
-                    <Tag tone="success">Available</Tag>
+                    <span className="inline-flex items-center gap-1 rounded border border-bb-yellow/60 bg-bb-yellow/15 px-2 py-0.5 font-mono text-[10px] font-extrabold uppercase tracking-wider text-bb-yellow">
+                      Available
+                    </span>
                     <p className="mt-2 text-[14px] font-semibold text-bb-ink">
                       {displayedEditorial.thread.name}
                     </p>

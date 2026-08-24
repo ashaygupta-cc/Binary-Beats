@@ -8,6 +8,7 @@ export interface SolvableProblem {
   index: string;
   title: string;
   rating: number | null;
+  difficulty?: string;
   tags: string[];
   judgeable: boolean;
   platform?: string;

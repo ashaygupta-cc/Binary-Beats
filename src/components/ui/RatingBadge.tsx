@@ -31,8 +31,8 @@ export function tierForRating(rating: number): string {
 // difficulty color can never collide with a verdict/status color (a "Hard"
 // tag and a WA verdict used to both read as red).
 export function difficultyLabel(rating: number): "Easy" | "Medium" | "Hard" {
-  if (rating <= 1300) return "Easy";
-  if (rating <= 1900) return "Medium";
+  if (rating < 1400) return "Easy";
+  if (rating < 1900) return "Medium";
   return "Hard";
 }
 
