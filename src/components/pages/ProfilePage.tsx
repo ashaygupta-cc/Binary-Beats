@@ -1,11 +1,11 @@
-import React from "react";
-import { botApi } from "../../lib/botApi";
+import React, { useEffect, useState } from "react";
 import { useBotData } from "../../hooks/useBotData";
+import { botApi, discordApi, type DiscordAttachment, type DiscordMessage } from "../../lib/botApi";
 import { navigate } from "../../lib/router";
-import { PageHeader, PageBody, DataState, SkeletonRows, EmptyState } from "../ui/PageShell";
-import { Panel } from "../ui/Panel";
 import { Button } from "../ui/Button";
 import { Eyebrow } from "../ui/Eyebrow";
+import { DataState, EmptyState, PageBody, PageHeader, SkeletonRows } from "../ui/PageShell";
+import { Panel } from "../ui/Panel";
 import { Tag } from "../ui/Tag";
 
 interface Props {
@@ -25,8 +25,41 @@ const Stat: React.FC<{ label: string; value: React.ReactNode }> = ({ label, valu
   </Panel>
 );
 
+const SUBMISSION_FILE_RE = /\.(cpp|c|java|py|pdf)$/i;
+const MAX_SUBMISSION_BYTES = 10 * 1024;
+
+function submissionAttachments(message: DiscordMessage): DiscordAttachment[] {
+  return (message.attachments ?? []).filter(
+    (attachment) => attachment.size <= MAX_SUBMISSION_BYTES && SUBMISSION_FILE_RE.test(attachment.filename)
+  );
+}
+
 export const ProfilePage: React.FC<Props> = ({ discordId, isSelf, playSound }) => {
   const { data, state, error, reload } = useBotData(() => botApi.profile(discordId), [discordId]);
+  const submissionThreads = useBotData(() => discordApi.threads("daily_problems", 60), []);
+  const [submissions, setSubmissions] = useState<DiscordMessage[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const threads = submissionThreads.data?.threads ?? [];
+    if (threads.length === 0) {
+      setSubmissions([]);
+      return () => { cancelled = true; };
+    }
+    void Promise.all(threads.map((thread) => discordApi.threadMessages(thread.thread_id)))
+      .then((responses) => {
+        if (cancelled) return;
+        const messages = responses
+          .flatMap((response) => response.messages.slice(1))
+          .filter((message) => (
+            message.author_id === discordId ||
+            message.author_name?.toLowerCase() === data?.user.discord_username.toLowerCase()
+          ) && submissionAttachments(message).length > 0)
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setSubmissions(messages);
+      })
+      .catch(() => { if (!cancelled) setSubmissions([]); });
+    return () => { cancelled = true; };
+  }, [discordId, submissionThreads.data]);
   const history = useBotData(
     () => botApi.duels({ discord_id: discordId, limit: 15 }),
     [discordId]
@@ -151,7 +184,34 @@ export const ProfilePage: React.FC<Props> = ({ discordId, isSelf, playSound }) =
               </section>
 
               <section>
-                <Eyebrow number="04">Match history</Eyebrow>
+                <Eyebrow number="04">Recent submissions</Eyebrow>
+                {submissions.length === 0 ? (
+                  <p className="mt-3 text-[13px] text-bb-ink-soft">No daily problem submissions yet.</p>
+                ) : (
+                  <ul className="mt-3 flex flex-col gap-2">
+                    {submissions.slice(0, 20).map((message) => (
+                      <li key={message.message_id}>
+                        <Panel className="p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-mono text-[11px] font-bold text-bb-ink">{message.author_name}</span>
+                            <span className="font-mono text-[10px] text-bb-ink-faint">{new Date(message.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {submissionAttachments(message).map((attachment) => (
+                              <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="rounded border border-bb-line-strong px-2 py-1 font-mono text-[10px] text-bb-yellow hover:border-bb-yellow">
+                                {attachment.filename}
+                              </a>
+                            ))}
+                          </div>
+                        </Panel>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              <section>
+                <Eyebrow number="05">Match history</Eyebrow>
                 <div className="mt-3">
                   <DataState
                     state={history.state}

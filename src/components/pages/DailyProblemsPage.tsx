@@ -1,14 +1,15 @@
 import React, { useMemo, useState } from "react";
-import { botApi, discordApi, type DailyProblem } from "../../lib/botApi";
-import { useBotData } from "../../hooks/useBotData";
 import { DISCORD_INVITE } from "../../data/site";
-import { PageHeader, PageBody, DataState, SkeletonRows, EmptyState } from "../ui/PageShell";
-import { Panel } from "../ui/Panel";
+import { useBotData } from "../../hooks/useBotData";
+import { botApi, discordApi, type DailyProblem } from "../../lib/botApi";
 import { Button } from "../ui/Button";
-import { Tag } from "../ui/Tag";
 import { Eyebrow } from "../ui/Eyebrow";
+import { DataState, EmptyState, PageBody, PageHeader, SkeletonRows } from "../ui/PageShell";
+import { Panel } from "../ui/Panel";
+import { Tag } from "../ui/Tag";
 
 interface Props {
+  user?: { id: string; username: string; globalName?: string | null } | null;
   gateReason: "anon" | "outsider" | null;
   onLogin?: () => void;
   playSound?: (t: "click" | "hover") => void;
@@ -72,6 +73,13 @@ function humanDate(iso: string): string {
   return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function threadDate(thread: { editorial_date: string | null; name: string; created_at: string }): string {
+  if (thread.editorial_date) return thread.editorial_date.slice(0, 10);
+  const match = thread.name.match(/\((\d{2})-(\d{2})-(\d{2,4})\)/);
+  if (match) return `${match[3].length === 2 ? `20${match[3]}` : match[3]}-${match[2]}-${match[1]}`;
+  return thread.created_at.slice(0, 10);
+}
+
 export const DailyProblemsPage: React.FC<Props> = ({ gateReason, onLogin, playSound }) => {
   const [platform, setPlatform] = useState<string>(
     () => sessionStorage.getItem("bb_daily_platform") ?? ""
@@ -84,6 +92,7 @@ export const DailyProblemsPage: React.FC<Props> = ({ gateReason, onLogin, playSo
     () => botApi.problems({ limit: 60, platform: platform || undefined }),
     [platform]
   );
+  const threads = useBotData(() => discordApi.threads("daily_problems", 100), []);
 
   const groups = useMemo(
     () => (data ? groupByDate(data.problems) : []),
@@ -163,6 +172,7 @@ export const DailyProblemsPage: React.FC<Props> = ({ gateReason, onLogin, playSo
                     {items.map((p) => {
                       const url = problemUrl(p);
                       const tone = DIFF_TONE[p.difficulty?.toLowerCase()] ?? "neutral";
+                      const matchingThread = threads.data?.threads.find((thread) => threadDate(thread) === date);
                       return (
                         <li key={p.id} className="flex">
                           <Panel
@@ -187,20 +197,34 @@ export const DailyProblemsPage: React.FC<Props> = ({ gateReason, onLogin, playSo
                               <span className="font-mono text-[11px] text-bb-ink-faint">
                                 {p.solve_count} solved
                               </span>
-                              {url && (
-                                <Button
-                                  as="a"
-                                  href={url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  variant="primary"
-                                  size="sm"
-                                  onClick={(e) => e.stopPropagation()}
-                                  onMouseEnter={() => playSound?.("hover")}
-                                >
-                                  Solve on {p.platform} ↗
-                                </Button>
-                              )}
+                              <div className="flex flex-wrap justify-end gap-2">
+                                {matchingThread && (
+                                  <Button
+                                    as="a"
+                                    href={`/c/daily-problems/${matchingThread.thread_id}`}
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => e.stopPropagation()}
+                                    onMouseEnter={() => playSound?.("hover")}
+                                  >
+                                    Other submissions
+                                  </Button>
+                                )}
+                                {url && (
+                                  <Button
+                                    as="a"
+                                    href={url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={(e) => e.stopPropagation()}
+                                    onMouseEnter={() => playSound?.("hover")}
+                                  >
+                                    Solve on {p.platform} ↗
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           </Panel>
                         </li>

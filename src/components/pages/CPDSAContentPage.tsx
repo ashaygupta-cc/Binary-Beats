@@ -1,23 +1,22 @@
 import React, { useMemo, useState } from "react";
-import { botApi, discordApi, type DailyProblem, type DiscordMessage, type ApiContest } from "../../lib/botApi";
-import { useBotData } from "../../hooks/useBotData";
-import { navigate } from "../../lib/router";
-import { PageHeader, PageBody, DataState, SkeletonRows, EmptyState } from "../ui/PageShell";
-import { Panel } from "../ui/Panel";
-import { Button } from "../ui/Button";
-import { Tag } from "../ui/Tag";
-import { Eyebrow } from "../ui/Eyebrow";
-import { PdfViewerModal } from "../ui/PdfViewerModal";
 import { DISCORD_INVITE } from "../../data/site";
-import { ArticleView } from "../renderers/ArticleView";
-import { RoadmapView } from "../renderers/RoadmapView";
-import { ContestCalendarView } from "../renderers/ContestCalendarView";
+import { useBotData } from "../../hooks/useBotData";
 import type { DiscordUser } from "../../hooks/useDiscordAuth";
-import { dailyProblemToSolvable } from "../solve/adapters";
-import { getProblemExternalUrl } from "../solve/types";
 import { useProblems } from "../../hooks/useProblems";
+import { botApi, discordApi, type ApiContest, type DailyProblem } from "../../lib/botApi";
+import { navigate } from "../../lib/router";
+import { ContestCalendarView } from "../renderers/ContestCalendarView";
+import { RoadmapView } from "../renderers/RoadmapView";
+import { dailyProblemToSolvable } from "../solve/adapters";
 import { SolveWorkspace } from "../solve/SolveWorkspace";
 import type { SolvableProblem } from "../solve/types";
+import { getProblemExternalUrl } from "../solve/types";
+import { Button } from "../ui/Button";
+import { Eyebrow } from "../ui/Eyebrow";
+import { DataState, EmptyState, PageBody, PageHeader, SkeletonRows } from "../ui/PageShell";
+import { Panel } from "../ui/Panel";
+import { PdfViewerModal } from "../ui/PdfViewerModal";
+import { Tag } from "../ui/Tag";
 
 
 interface Props {
@@ -34,6 +33,8 @@ const TABS: { id: Exclude<ContentTab, "roadmap" | "contests">; label: string }[]
   { id: "oa", label: "OA Questions" },
   { id: "theory", label: "Algorithmic Theory" },
 ];
+
+const DATE_OFFSET_KEY = "bb_cpdsa_date_offset";
 
 interface TodayContestGridProps {
   contests: ApiContest[];
@@ -148,8 +149,10 @@ function dateStr(offset: number): string {
 
 function editorialDate(thread: { editorial_date: string | null; name: string }): string | null {
   if (thread.editorial_date) return thread.editorial_date.slice(0, 10);
-  const match = thread.name.match(/\((\d{2})-(\d{2})-(\d{2})\)/);
-  return match ? `20${match[3]}-${match[2]}-${match[1]}` : null;
+  const match = thread.name.match(/\((\d{2})-(\d{2})-(\d{2,4})\)/);
+  if (!match) return null;
+  const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+  return `${year}-${match[2]}-${match[1]}`;
 }
 
 function humanDate(iso: string): string {
@@ -428,11 +431,18 @@ export const CPDSAContentPage: React.FC<Props> = ({ user, gateReason, onLogin, p
   const [tab, setTab] = useState<ContentTab>(
     () => (sessionStorage.getItem("bb_cpdsa_tab") as any) ?? "problems"
   );
-  const [dateOffset, setDateOffset] = useState(0);
+  const [dateOffset, setDateOffset] = useState(() => {
+    const stored = Number(sessionStorage.getItem(DATE_OFFSET_KEY));
+    return Number.isInteger(stored) ? Math.max(-30, Math.min(0, stored)) : 0;
+  });
 
   React.useEffect(() => {
     sessionStorage.setItem("bb_cpdsa_tab", tab);
   }, [tab]);
+
+  React.useEffect(() => {
+    sessionStorage.setItem(DATE_OFFSET_KEY, String(dateOffset));
+  }, [dateOffset]);
 
   const [activeSolvableProblem, setActiveSolvableProblem] = useState<SolvableProblem | null>(null);
 
@@ -479,6 +489,11 @@ export const CPDSAContentPage: React.FC<Props> = ({ user, gateReason, onLogin, p
   );
   const editorialThreads = useBotData(
     () => discordApi.threads("daily_editorials"),
+    [],
+    { enabled: tab === "problems" }
+  );
+  const dailyProblemThreads = useBotData(
+    () => discordApi.threads("daily_problems", 100),
     [],
     { enabled: tab === "problems" }
   );
@@ -629,6 +644,9 @@ export const CPDSAContentPage: React.FC<Props> = ({ user, gateReason, onLogin, p
                       {todaysProblems.map((p) => {
                         const tone = DIFF_TONE[p.difficulty?.toLowerCase()] ?? "neutral";
                         const url = problemUrlFor(p);
+                        const submissionThread = dailyProblemThreads.data?.threads.find(
+                          (thread) => editorialDate(thread) === selectedDate
+                        );
                         return (
                           <li key={p.id}>
                             <Panel
@@ -649,17 +667,30 @@ export const CPDSAContentPage: React.FC<Props> = ({ user, gateReason, onLogin, p
                                 <span className="font-mono text-[11px] text-bb-ink-faint">
                                   {p.solve_count} solved
                                 </span>
-                                <Button
-                                  variant="primary"
-                                  size="sm"
-                                  onClick={(e: React.MouseEvent) => {
-                                    e.stopPropagation();
-                                    playSound?.("click");
-                                    handleOpenProblem(dailyProblemToSolvable(p));
-                                  }}
-                                >
-                                  Solve
-                                </Button>
+                                <div className="flex flex-wrap justify-end gap-2">
+                                  {submissionThread && (
+                                    <Button
+                                      as="a"
+                                      href={`/c/daily-problems/${submissionThread.thread_id}`}
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      Other submissions
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={(e: React.MouseEvent) => {
+                                      e.stopPropagation();
+                                      playSound?.("click");
+                                      handleOpenProblem(dailyProblemToSolvable(p));
+                                    }}
+                                  >
+                                    Solve
+                                  </Button>
+                                </div>
                               </div>
                             </Panel>
                           </li>

@@ -1,26 +1,26 @@
+import { motion } from "motion/react";
 import React, { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { motion } from "motion/react";
 import { useCodeDraft } from "../../hooks/useCodeDraft";
 import { useSubmissionHistory } from "../../hooks/useSubmissionHistory";
-import { runCode, DEFAULT_CPP_CODE } from "../../lib/wandbox";
 import { getHighlightedCode } from "../../lib/cppHighlight";
 import {
-  createRun,
-  pollRun,
-  JudgeApiError,
-  type CustomOutput,
-  type SampleResult,
-  type Verdict,
+    createRun,
+    JudgeApiError,
+    pollRun,
+    type CustomOutput,
+    type SampleResult,
+    type Verdict,
 } from "../../lib/judgeApi";
 import { verdictTone, type VerdictStatus } from "../../lib/verdictTone";
+import { DEFAULT_CPP_CODE, runCode } from "../../lib/wandbox";
 import { ConfettiBurst } from "../Effects/ConfettiBurst";
+import { Button } from "../ui/Button";
+import { Eyebrow } from "../ui/Eyebrow";
+import { VerdictBadge } from "../ui/VerdictBadge";
 import { DiffViewer } from "./DiffViewer";
 import { SubmissionHistoryPanel } from "./SubmissionHistoryPanel";
 import { TestGrid, tilesFromProgress, tilesFromVerdict } from "./TestGrid";
-import { VerdictBadge } from "../ui/VerdictBadge";
-import { Eyebrow } from "../ui/Eyebrow";
-import { Button } from "../ui/Button";
 
 interface CodeWorkspaceProps {
   problemKey: string;
@@ -50,6 +50,28 @@ const FONT_SIZE_MIN = 11;
 const FONT_SIZE_MAX = 18;
 const FONT_SIZE_DEFAULT = 12;
 const LINE_HEIGHT_RATIO = 21 / 12;
+
+function getExternalProblemUrl(problemKey: string, platform?: string): string | null {
+  const key = problemKey.trim();
+  const normalizedPlatform = platform?.toLowerCase();
+  if (normalizedPlatform === "leetcode" || normalizedPlatform === "lc" || key.startsWith("LC-")) {
+    return `https://leetcode.com/problems/${key.replace(/^LC-/i, "")}/`;
+  }
+  if (normalizedPlatform === "codechef" || normalizedPlatform === "cc") {
+    return `https://www.codechef.com/problems/${key}`;
+  }
+  if (normalizedPlatform === "atcoder" || normalizedPlatform === "ac") {
+    const parts = key.split("_");
+    return `https://atcoder.jp/contests/${parts[0]?.toLowerCase() || key.toLowerCase()}/tasks/${key}`;
+  }
+  if (normalizedPlatform === "codeforces" || normalizedPlatform === "cf" || /^\d+[A-Za-z]\d?$/.test(key)) {
+    const match = key.match(/^(\d+)([A-Za-z]\d?)$/);
+    return match
+      ? `https://codeforces.com/problemset/problem/${match[1]}/${match[2]}`
+      : "https://codeforces.com/problemset";
+  }
+  return null;
+}
 
 function readFontSize(): number {
   try {
@@ -233,6 +255,7 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
 
   const lineHeight = Math.round(fontSize * LINE_HEIGHT_RATIO);
   const hasExamples = examples.length > 0 || judgeable || Boolean(platform);
+  const externalUrl = getExternalProblemUrl(problemKey, platform);
 
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null);

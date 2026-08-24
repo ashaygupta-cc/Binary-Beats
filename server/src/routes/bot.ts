@@ -11,11 +11,11 @@
  * This file contains no business logic — it forwards and caches. The bot
  * remains the single source of truth.
  */
-import { Router, type Request, type Response } from "express";
 import { sql } from "drizzle-orm";
+import { Router, type Request, type Response } from "express";
+import { createSession, type BlitzMode } from "../blitzSession.js";
 import { db, dbLC } from "../db/index.js";
 import { problems } from "../db/schema.js";
-import { createSession, type BlitzMode } from "../blitzSession.js";
 import { saveSession } from "../sessionStore.js";
 
 const router = Router();
@@ -45,6 +45,47 @@ interface CacheEntry {
 }
 
 const memoryCache = new Map<string, CacheEntry>();
+
+router.get("/attachments/preview", async (req: Request, res: Response) => {
+  const rawUrl = typeof req.query.url === "string" ? req.query.url : "";
+  let attachmentUrl: URL;
+  try {
+    attachmentUrl = new URL(rawUrl);
+  } catch {
+    return res.status(400).json({ error: "BAD_REQUEST", message: "Invalid attachment URL." });
+  }
+  if (attachmentUrl.protocol !== "https:" || !["cdn.discordapp.com", "media.discordapp.net"].includes(attachmentUrl.hostname)) {
+    return res.status(400).json({ error: "BAD_REQUEST", message: "Attachment host is not allowed." });
+  }
+  try {
+    const upstream = await fetch(attachmentUrl, { signal: AbortSignal.timeout(10_000) });
+    if (!upstream.ok) return res.status(upstream.status).end();
+    res.type("text/plain; charset=utf-8");
+    res.set("Content-Disposition", "inline");
+    return res.send(await upstream.text());
+  } catch {
+    return res.status(502).json({ error: "PREVIEW_UNAVAILABLE", message: "Attachment preview is unavailable." });
+  }
+});
+
+async function proxyPost(path: string, body: unknown, timeoutMs = 15_000): Promise<globalThis.Response | null> {
+  if (!BOT_API_URL) return null;
+  try {
+    const upstream = await fetch(`${BOT_API_URL}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(BB_API_KEY ? { "X-BB-Key": BB_API_KEY } : {}),
+      },
+      body: JSON.stringify(body ?? {}),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return upstream;
+  } catch (err) {
+    console.warn(`[bot-proxy] POST ${path} failed:`, err);
+    return null;
+  }
+}
 
 router.use(async (req: Request, res: Response, next) => {
   // Only forward GETs through the read cache; POSTs (e.g. duels/verify) bypass.
@@ -92,6 +133,31 @@ router.use(async (req: Request, res: Response, next) => {
       detail: reason,
     });
   }
+});
+
+router.post("/problems/check", async (req: Request, res: Response) => {
+  const upstream = await proxyPost("/api/problems/check", req.body, 15_000);
+  if (upstream) {
+    const data = await upstream.json().catch(() => ({})) as {
+      success?: boolean;
+      results?: string[];
+      earned?: number;
+      message?: string;
+    };
+    if (typeof data.success !== "boolean") {
+      return res.status(upstream.status).json({
+        success: upstream.ok,
+        results: data.message ? [data.message] : [],
+        earned: Number(data.earned) || 0,
+      });
+    }
+    return res.status(upstream.status).json(data);
+  }
+
+  return res.status(503).json({
+    error: "BOT_UNREACHABLE",
+    message: "The Binary Beats bot API is currently unreachable. Try syncing again shortly.",
+  });
 });
 
 router.post("/duels/create", async (req: Request, res: Response) => {

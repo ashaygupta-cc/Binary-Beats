@@ -1,30 +1,118 @@
-import React, { useState, useMemo } from "react";
-import { botApi, discordApi, type DiscordMessage, type DiscordAttachment } from "../../lib/botApi";
-import { useBotData } from "../../hooks/useBotData";
+import React, { useEffect, useState } from "react";
 import { channelBySlug } from "../../data/channels";
+import { useBotData } from "../../hooks/useBotData";
+import { botApi, discordApi, type DiscordAttachment, type DiscordMessage } from "../../lib/botApi";
 import { navigate } from "../../lib/router";
-import { PageHeader, PageBody, DataState, SkeletonRows, EmptyState } from "../ui/PageShell";
-import { DiscordMessageCard, renderMarkdown } from "../discord/DiscordMessageCard";
-import { Panel } from "../ui/Panel";
+import { DiscordMessageCard } from "../discord/DiscordMessageCard";
 import { Button } from "../ui/Button";
-import { Tag } from "../ui/Tag";
 import { InlinePdfViewer } from "../ui/InlinePdfViewer";
+import { DataState, EmptyState, PageBody, PageHeader, SkeletonRows } from "../ui/PageShell";
+import { Panel } from "../ui/Panel";
+import { Tag } from "../ui/Tag";
 
 // ── Dedicated renderers ──────────────────────────────────────────
-import { TeamView } from "../renderers/TeamView";
-import { AboutView } from "../renderers/AboutView";
-import { ArenaGuideView } from "../renderers/ArenaGuideView";
-import { ArticleView } from "../renderers/ArticleView";
 import { ContestCalendarView } from "../renderers/ContestCalendarView";
-import { RoadmapView } from "../renderers/RoadmapView";
 import { SocialLinksView } from "../renderers/SocialLinksView";
 
 interface Props {
   slug: string;
   threadId?: string;
   playSound?: (t: "click" | "hover") => void;
-  user?: { id: string; username: string; globalName?: string } | null;
+  user?: { id: string; username: string; globalName?: string | null } | null;
 }
+
+const LOCAL_SUBMISSIONS_KEY = "bb_daily_submissions_v1";
+const SUBMISSION_FILE_RE = /\.(cpp|c|java|py|pdf)$/i;
+const MAX_SUBMISSION_BYTES = 10 * 1024;
+
+type LocalSubmission = {
+  id: string;
+  authorName: string;
+  authorAvatar?: string;
+  tag: string;
+  code?: string;
+  filename?: string;
+  timestamp: string;
+  earnedPts?: number;
+};
+
+function readLocalSubmissions(threadKey: string): LocalSubmission[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_SUBMISSIONS_KEY);
+    const all = raw ? JSON.parse(raw) as Record<string, LocalSubmission[]> : {};
+    return Array.isArray(all[threadKey]) ? all[threadKey] : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalSubmissions(threadKey: string, submissions: LocalSubmission[]) {
+  try {
+    const raw = localStorage.getItem(LOCAL_SUBMISSIONS_KEY);
+    const all = raw ? JSON.parse(raw) as Record<string, LocalSubmission[]> : {};
+    all[threadKey] = submissions.slice(0, 3);
+    localStorage.setItem(LOCAL_SUBMISSIONS_KEY, JSON.stringify(all));
+  } catch {
+    // Local persistence is best effort; Discord remains the shared source.
+  }
+}
+
+function submissionAttachments(message: DiscordMessage): DiscordAttachment[] {
+  return (message.attachments ?? []).filter(
+    (attachment) => attachment.size <= MAX_SUBMISSION_BYTES && SUBMISSION_FILE_RE.test(attachment.filename)
+  );
+}
+
+function threadDate(thread: { editorial_date: string | null; name: string; created_at: string }): string {
+  if (thread.editorial_date) return thread.editorial_date.slice(0, 10);
+  const match = thread.name.match(/\((\d{2})-(\d{2})-(\d{2,4})\)/);
+  if (match) {
+    const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+    return `${year}-${match[2]}-${match[1]}`;
+  }
+  return thread.created_at.slice(0, 10);
+}
+
+const SubmissionAttachmentPreview: React.FC<{ attachment: DiscordAttachment }> = ({ attachment }) => {
+  const [code, setCode] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const isPdf = /\.pdf$/i.test(attachment.filename);
+
+  useEffect(() => {
+    if (isPdf) return;
+    const controller = new AbortController();
+    void fetch(`/api/bot/attachments/preview?url=${encodeURIComponent(attachment.url)}`, { signal: controller.signal })
+      .then((response) => response.ok ? response.text() : Promise.reject(new Error("preview failed")))
+      .then(setCode)
+      .catch((previewError: unknown) => {
+        if ((previewError as { name?: string }).name !== "AbortError") setError(true);
+      });
+    return () => controller.abort();
+  }, [attachment.url, isPdf]);
+
+  if (isPdf) {
+    return (
+      <div className="mt-2 h-[520px] overflow-hidden rounded border border-bb-line bg-bb-ground">
+        <iframe
+          src={attachment.url}
+          title={attachment.filename}
+          className="h-full w-full border-0"
+        />
+      </div>
+    );
+  }
+  if (error) {
+    return <p className="mt-2 rounded border border-dashed border-bb-line-strong p-3 font-mono text-[10px] text-bb-ink-faint">Inline preview unavailable. Download the file to view it.</p>;
+  }
+  if (code === null) {
+    return <p className="mt-2 rounded border border-bb-line bg-bb-ground p-3 font-mono text-[10px] text-bb-ink-faint">Loading code preview...</p>;
+  }
+  return (
+    <pre className="mt-2 max-h-[420px] overflow-auto rounded border border-bb-line bg-bb-ground p-3 font-mono text-[10px] leading-relaxed text-bb-ink">
+      <code>{code}</code>
+    </pre>
+  );
+};
 
 /** Check if a given date string is today in IST (UTC+5:30) and if the day points window is active */
 function isDayActiveIST(dateStrCandidate?: string | null): boolean {
@@ -60,16 +148,15 @@ export const ChannelPage: React.FC<Props> = ({ slug, threadId, playSound, user }
   const [solutionFile, setSolutionFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [localSubmissions, setLocalSubmissions] = useState<Array<{
-    id: string;
-    authorName: string;
-    authorAvatar?: string;
-    tag: string;
-    code?: string;
-    filename?: string;
-    timestamp: string;
-    earnedPts?: number;
-  }>>([]);
+  const [localSubmissions, setLocalSubmissions] = useState<LocalSubmission[]>(() =>
+    threadId ? readLocalSubmissions(threadId) : []
+  );
+  const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLocalSubmissions(threadId ? readLocalSubmissions(threadId) : []);
+    setExpandedSubmissionId(null);
+  }, [threadId]);
 
   const feed = useBotData(
     () => discordApi.messages(channel!.key, {
@@ -89,6 +176,34 @@ export const ChannelPage: React.FC<Props> = ({ slug, threadId, playSound, user }
     () => discordApi.threadMessages(threadId!),
     [threadId],
     { enabled: Boolean(threadId) }
+  );
+
+  const isDualThread = Boolean(
+    threadId && (channel?.key === "daily_editorials" || channel?.key === "daily_problems")
+  );
+  const dailyProblemThreads = useBotData(
+    () => discordApi.threads("daily_problems", 100),
+    [],
+    { enabled: isDualThread }
+  );
+  const editorialThreads = useBotData(
+    () => discordApi.threads("daily_editorials", 100),
+    [],
+    { enabled: isDualThread }
+  );
+  const currentThreadMeta = threads.data?.threads.find((candidate) => candidate.thread_id === threadId);
+  const currentThreadDate = currentThreadMeta
+    ? threadDate(currentThreadMeta)
+    : thread.data?.messages[0]?.created_at.slice(0, 10) ?? null;
+  const pairedThreadId = isDualThread && currentThreadDate
+    ? (channel?.key === "daily_problems"
+      ? editorialThreads.data?.threads.find((candidate) => threadDate(candidate) === currentThreadDate)?.thread_id
+      : dailyProblemThreads.data?.threads.find((candidate) => threadDate(candidate) === currentThreadDate)?.thread_id)
+    : undefined;
+  const pairedThread = useBotData(
+    () => discordApi.threadMessages(pairedThreadId!),
+    [pairedThreadId],
+    { enabled: Boolean(pairedThreadId) }
   );
 
   const contestsData = useBotData(
@@ -132,27 +247,27 @@ export const ChannelPage: React.FC<Props> = ({ slug, threadId, playSound, user }
   }
 
   // ── DUAL-PANEL EDITORIALS & OTHER SUBMISSIONS VIEW ──────────────────
-  if (threadId && (channel.key === "daily_editorials" || channel.slug === "editorials")) {
+  if (threadId && (channel.key === "daily_editorials" || channel.slug === "editorials" || channel.key === "daily_problems")) {
     const threadMessages = thread.data?.messages || [];
-    const officialMsg = threadMessages[0];
     
-    // Find all PDF attachments across the thread with comprehensive check
-    const isPdf = (a: any) => Boolean(
-      a && (
-        a.is_pdf === true ||
-        (typeof a.filename === "string" && a.filename.toLowerCase().includes(".pdf")) ||
-        (typeof a.url === "string" && a.url.toLowerCase().includes(".pdf")) ||
-        (typeof a.content_type === "string" && a.content_type.includes("pdf"))
-      )
-    );
-    const allAttachments = threadMessages.flatMap(m => m.attachments || []);
+    // The first post is the bot's problem announcement; only later posts are submissions.
+    const isDailyProblemThread = channel.key === "daily_problems";
+    const editorialMessages = isDailyProblemThread
+      ? pairedThread.data?.messages || []
+      : threadMessages;
+    const submissionMessages = isDailyProblemThread
+      ? threadMessages
+      : pairedThread.data?.messages || [];
+    const officialMsg = editorialMessages[0];
+    const isPdf = (a: any) => Boolean(a?.is_pdf === true || (typeof a?.filename === "string" && a.filename.toLowerCase().endsWith(".pdf")));
+    const allAttachments = editorialMessages.flatMap(m => m.attachments || []);
     const pdfAttachments = allAttachments.filter(isPdf);
 
     // Check if the current day is active (locked till 23:59 IST)
-    const isTodayActive = isDayActiveIST(officialMsg?.created_at || "");
+    const isTodayActive = isDayActiveIST(currentThreadDate);
 
     // User submissions extracted from subsequent thread messages
-    const communityMessages = threadMessages.slice(1);
+    const communityMessages = submissionMessages.slice(1).filter((message) => submissionAttachments(message).length > 0);
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -213,7 +328,11 @@ export const ChannelPage: React.FC<Props> = ({ slug, threadId, playSound, user }
           earnedPts: earnedPts || 6,
         };
 
-        setLocalSubmissions(prev => [newSub, ...prev]);
+        setLocalSubmissions(prev => {
+          const next = [newSub, ...prev].slice(0, 3);
+          if (threadId) writeLocalSubmissions(threadId, next);
+          return next;
+        });
         setSolutionCode("");
         setSolutionFile(null);
         setUploadMessage({ type: "success", text: "AC Solution uploaded & points verified!" });
@@ -297,8 +416,12 @@ export const ChannelPage: React.FC<Props> = ({ slug, threadId, playSound, user }
                     </Panel>
                   ) : (
                     <div className="flex flex-col gap-4">
-                      {officialMsg && (
+                      {officialMsg ? (
                         <DiscordMessageCard message={officialMsg} />
+                      ) : (
+                        <Panel className="flex min-h-[380px] items-center justify-center border-dashed p-8 text-center">
+                          <p className="font-mono text-xs text-bb-ink-faint">No editorial available for this date.</p>
+                        </Panel>
                       )}
 
                       {/* Inline PDF Preview Reader */}
@@ -428,7 +551,17 @@ export const ChannelPage: React.FC<Props> = ({ slug, threadId, playSound, user }
                               {m.author_avatar && (
                                 <img src={m.author_avatar} alt="" className="h-5 w-5 rounded-full border border-bb-line" />
                               )}
-                              <span className="font-mono text-[11px] font-bold text-bb-ink">{m.author_name}</span>
+                              {m.author_id ? (
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`u/${m.author_id}`)}
+                                  className="font-mono text-[11px] font-bold text-bb-ink hover:text-bb-yellow cursor-pointer"
+                                >
+                                  {m.author_name}
+                                </button>
+                              ) : (
+                                <span className="font-mono text-[11px] font-bold text-bb-ink">{m.author_name}</span>
+                              )}
                             </div>
                             <span className="font-mono text-[9px] uppercase text-bb-ink-faint">
                               {new Date(m.created_at).toLocaleDateString()}
@@ -443,10 +576,16 @@ export const ChannelPage: React.FC<Props> = ({ slug, threadId, playSound, user }
                             </div>
                           ) : (
                             <>
-                              {m.content && <div className="text-bb-ink text-[12px]">{renderMarkdown(m.content)}</div>}
-                              {m.attachments?.map(att => (
-                                <div key={att.id} className="mt-2 rounded border border-bb-line bg-bb-ground p-2 flex items-center justify-between">
-                                  <span className="font-mono text-[10px] text-bb-ink truncate">{att.filename}</span>
+                              {submissionAttachments(m).map(att => (
+                                <div key={att.id} className="mt-2 rounded border border-bb-line bg-bb-ground p-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedSubmissionId((current) => current === att.id ? null : att.id)}
+                                      className="min-w-0 truncate text-left font-mono text-[10px] text-bb-ink hover:text-bb-yellow cursor-pointer"
+                                    >
+                                      {att.filename}
+                                    </button>
                                   <a
                                     href={att.url}
                                     download={att.filename}
@@ -454,6 +593,8 @@ export const ChannelPage: React.FC<Props> = ({ slug, threadId, playSound, user }
                                   >
                                     Download
                                   </a>
+                                  </div>
+                                  {expandedSubmissionId === att.id && <SubmissionAttachmentPreview attachment={att} />}
                                 </div>
                               ))}
                             </>
