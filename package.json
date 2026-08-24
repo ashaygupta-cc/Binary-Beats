@@ -1,7 +1,7 @@
 {
   "name": "binary-beats-web",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "scripts": {
     "dev": "concurrently -n web,api -c cyan,green \"npm:dev:client\" \"npm:dev:server\"",
@@ -24,9 +24,13 @@
     "vite": "^8.1.1"
   },
   "dependencies": {
+    "@splinetool/react-spline": "^4.1.0",
+    "@splinetool/runtime": "^2.0.5",
+    "@types/three": "^0.185.4",
     "katex": "^0.17.0",
     "motion": "^12.42.2",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "three": "^0.185.1"
   }
 }

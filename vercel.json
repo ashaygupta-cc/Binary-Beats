@@ -6,11 +6,11 @@
   "rewrites": [
     {
       "source": "/api/bot/:path*",
-      "destination": "https://cp-bot-8pru.onrender.com/api/:path*"
+      "destination": "https://cp-bot-c8pz.onrender.com/api/:path*"
     },
     {
       "source": "/api/:path*",
-      "destination": "https://cp-bot-8pru.onrender.com/api/:path*"
+      "destination": "https://cp-bot-c8pz.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
