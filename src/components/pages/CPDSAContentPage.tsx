@@ -146,6 +146,12 @@ function dateStr(offset: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function editorialDate(thread: { editorial_date: string | null; name: string }): string | null {
+  if (thread.editorial_date) return thread.editorial_date.slice(0, 10);
+  const match = thread.name.match(/\((\d{2})-(\d{2})-(\d{2})\)/);
+  return match ? `20${match[3]}-${match[2]}-${match[1]}` : null;
+}
+
 function humanDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -466,11 +472,23 @@ export const CPDSAContentPage: React.FC<Props> = ({ user, gateReason, onLogin, p
     [dateOffset],
     { enabled: tab === "problems" }
   );
+  const editorialThreads = useBotData(
+    () => discordApi.threads("daily_editorials"),
+    [],
+    { enabled: tab === "problems" }
+  );
   const contestsData = useBotData(() => botApi.contests(), []);
   const contests = contestsData.data?.contests ?? [];
 
   // ── Today's problems (day-wise) ───────────────────────────────
   const selectedDate = dateStr(dateOffset);
+  const displayedEditorial = useMemo(() => {
+    if (editorial.data?.status === "available") return editorial.data;
+    const thread = editorialThreads.data?.threads.find((candidate) => editorialDate(candidate) === selectedDate);
+    return thread?.has_pdf
+      ? { date: selectedDate, status: "available" as const, thread }
+      : editorial.data;
+  }, [editorial.data, editorialThreads.data, selectedDate]);
   const todaysProblems = useMemo(() => {
     if (!problems.data) return [];
     return problems.data.problems.filter((p) => p.assigned_date?.slice(0, 10) === selectedDate);
@@ -653,16 +671,16 @@ export const CPDSAContentPage: React.FC<Props> = ({ user, gateReason, onLogin, p
               {/* Editorial sidebar — 1 col */}
               <div className="flex flex-col gap-3">
                 <Eyebrow>Editorial</Eyebrow>
-                {editorial.data?.status === "available" && editorial.data.thread ? (
+                {displayedEditorial?.status === "available" && displayedEditorial.thread ? (
                   <Panel className="p-4">
                     <Tag tone="success">Available</Tag>
                     <p className="mt-2 text-[14px] font-semibold text-bb-ink">
-                      {editorial.data.thread.name}
+                      {displayedEditorial.thread.name}
                     </p>
                     <p className="mt-1 font-mono text-[11px] text-bb-ink-faint">
-                      {editorial.data.thread.message_count} posts
+                      {displayedEditorial.thread.message_count} posts
                     </p>
-                    {editorial.data.files?.filter((f) => f.is_pdf).map((f) => (
+                    {displayedEditorial.files?.filter((f) => f.is_pdf).map((f) => (
                       <button
                         key={f.id}
                         onClick={(e) => { e.stopPropagation(); setEditorialPdf({ url: f.url, filename: f.filename }); }}
@@ -674,12 +692,12 @@ export const CPDSAContentPage: React.FC<Props> = ({ user, gateReason, onLogin, p
                     ))}
                     <Button
                       variant="outline" size="sm" className="mt-3 w-full"
-                      onClick={() => navigate(`c/editorials/${editorial.data!.thread!.thread_id}`)}
+                      onClick={() => navigate(`c/editorials/${displayedEditorial.thread!.thread_id}`)}
                     >
                       View Editorial
                     </Button>
                   </Panel>
-                ) : editorial.data?.status === "coming_soon" ? (
+                ) : displayedEditorial?.status === "coming_soon" ? (
                   <Panel className="p-4">
                     <Tag tone="warning">Coming Soon</Tag>
                     <p className="mt-2 text-[13px] text-bb-ink-soft">
