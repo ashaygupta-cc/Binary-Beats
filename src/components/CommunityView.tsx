@@ -11,6 +11,7 @@ interface CommunityViewProps {
   playSound: (type: 'click' | 'hover') => void;
   sharedCode: { problemTitle: string; code: string } | null;
   onClearSharedCode: () => void;
+  showHeader?: boolean;
 }
 
 interface ForumThread {
@@ -23,6 +24,8 @@ interface ForumThread {
   content: string;
   tag: 'Solutions' | 'Contest' | 'General' | 'Bugs';
   upvotes: number;
+  downvotes?: number;
+  timestamp?: number;
   commentsCount: number;
   date: string;
   comments: Array<{
@@ -58,7 +61,53 @@ const TAG_ACCENT: Record<ForumThread['tag'], string> = {
   Bugs: 'bg-purple-400',
 };
 
-const DEFAULT_THREADS: ForumThread[] = [];
+const DEFAULT_THREADS: ForumThread[] = [
+  {
+    id: "th_1",
+    title: "Google Online Assessment 2026 Breakdown — Tree DP & Path Reconstructions",
+    author: "zodiac.z408",
+    avatar: "Z4",
+    content: "Sharing an intuitive formulation for the sub-tree path query asked in recent Google SWE OA rounds. The core trick is rerooting DP with prefix/suffix optimization to achieve O(N) instead of O(N^2).\n\n```cpp\nvoid dfs(int u, int p) {\n    dp[u] = val[u];\n    for (int v : adj[u]) {\n        if (v == p) continue;\n        dfs(v, u);\n        dp[u] = max(dp[u], dp[u] + dp[v]);\n    }\n}\n```\nFeel free to ask questions regarding the testcase constraints!",
+    tag: "Solutions",
+    upvotes: 24,
+    downvotes: 0,
+    timestamp: Date.now() - 2 * 3600 * 1000,
+    commentsCount: 7,
+    date: "2h ago",
+    comments: [
+      { id: "c1", author: "harshitv3rma", avatar: "HV", content: "Great breakdown! Does this handle negative edge weights cleanly?", date: "1h ago" },
+      { id: "c2", author: "zodiac.z408", avatar: "Z4", content: "Yes, by taking max(0LL, dp[v]) we prune negative subtrees.", date: "45m ago" }
+    ]
+  },
+  {
+    id: "th_2",
+    title: "Candidate Master (1900+) Road: Speed Tactics for Div. 2 Problem C and D",
+    author: "kunaldevnani",
+    avatar: "KD",
+    content: "Most Div. 2 rounds come down to speed on B and accuracy on C/D without wrong submissions. Here is the checklist of 5 standard paradigms you should practice: Binary Search on Answer, DSU Rollbacks, Coordinate Compression, Two-Pointer Invariants, and Bitmask DP.",
+    tag: "General",
+    upvotes: 18,
+    downvotes: 0,
+    timestamp: Date.now() - 5 * 3600 * 1000,
+    commentsCount: 4,
+    date: "5h ago",
+    comments: []
+  },
+  {
+    id: "th_3",
+    title: "Codeforces Round 1000 (Div. 2) Discussion & Post-Contest Review",
+    author: ".k_i_r_a.",
+    avatar: "KR",
+    content: "How did everyone find problem D? Was the greedy choice with priority queue provable or was constructive approach easier?",
+    tag: "Contest",
+    upvotes: 12,
+    downvotes: 0,
+    timestamp: Date.now() - 24 * 3600 * 1000,
+    commentsCount: 9,
+    date: "1d ago",
+    comments: []
+  }
+];
 
 const DEFAULT_CLANS: Clan[] = [
   { id: 'c1', name: 'Bit Shifters', tag: 'BITS', members: 24, weeklySolves: 312, desc: 'Optimizing O(1) algorithms and byte alignment.' },
@@ -71,6 +120,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   playSound,
   sharedCode,
   onClearSharedCode,
+  showHeader = true,
 }) => {
   const { user } = useDiscordAuth();
 
@@ -117,17 +167,20 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const [threads, setThreads] = useState<ForumThread[]>(() => {
     try {
       const saved = localStorage.getItem('bb_community_threads_clean_v7');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch {}
     return DEFAULT_THREADS;
   });
 
-  // Fetch live threads from DB API on mount
+  // Fetch live threads from DB API on mount (preserve default threads if DB empty)
   useEffect(() => {
     fetch('/api/community/threads')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           setThreads(data);
         }
       })
@@ -163,7 +216,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const [newClanDesc, setNewClanDesc] = useState('');
 
   // Handle Image Upload with <1MB constraint
-  const MAX_IMAGE_SIZE_BYTES = 1024 * 1024; // 1 MB (1,048,576 bytes)
+  const MAX_IMAGE_SIZE_BYTES = 50 * 1024; // 50 KB (51,200 bytes)
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -176,7 +229,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
     // 1MB max limit
     if (file.size > MAX_IMAGE_SIZE_BYTES) {
       setPostImage(null);
-      setImageError(`Image size must be less than 1MB (Selected file: ${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
+      setImageError(`Image size must be ≤ 50 KB (Selected: ${(file.size / 1024).toFixed(1)} KB)`);
       return;
     }
 
@@ -199,27 +252,151 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
     }
   }, [sharedCode]);
 
-  // Upvote logic (Persisted to DB)
-  const handleUpvote = (id: string, e: React.MouseEvent) => {
+  // User Votes State (Codeforces style single-vote ▲/▼)
+  const [userVotes, setUserVotes] = useState<Record<string, "up" | "down" | null>>(() => {
+    try {
+      const saved = localStorage.getItem("bb_user_votes_v8");
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  });
+
+  // User Penalties & Strikes (<= -10 Net Score triggers strike & auto-delete)
+  const [userStrikes, setUserStrikes] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem("bb_user_strikes_v8");
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  });
+
+  // Cooldown Expiry Timestamps
+  const [userCooldowns, setUserCooldowns] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem("bb_user_cooldowns_v8");
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("bb_user_votes_v8", JSON.stringify(userVotes));
+    } catch {}
+  }, [userVotes]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("bb_user_strikes_v8", JSON.stringify(userStrikes));
+    } catch {}
+  }, [userStrikes]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("bb_user_cooldowns_v8", JSON.stringify(userCooldowns));
+    } catch {}
+  }, [userCooldowns]);
+
+  // Unified CF Vote Handler (▲ Upvote / ▼ Downvote)
+  const handleVote = (id: string, direction: "up" | "down", e: React.MouseEvent) => {
     e.stopPropagation();
-    playSound('click');
-    setThreads(prev => prev.map(t => {
-      if (t.id === id) {
-        return { ...t, upvotes: t.upvotes + 1 };
+    playSound("click");
+
+    const currentVote = userVotes[id] ?? null;
+    let upDelta = 0;
+    let downDelta = 0;
+    let nextVote: "up" | "down" | null = null;
+
+    if (direction === "up") {
+      if (currentVote === "up") {
+        // Toggle off
+        upDelta = -1;
+        nextVote = null;
+      } else if (currentVote === "down") {
+        upDelta = 1;
+        downDelta = -1;
+        nextVote = "up";
+      } else {
+        upDelta = 1;
+        nextVote = "up";
       }
-      return t;
-    }));
-    if (selectedThread && selectedThread.id === id) {
-      setSelectedThread(prev => prev ? { ...prev, upvotes: prev.upvotes + 1 } : null);
+    } else {
+      if (currentVote === "down") {
+        // Toggle off
+        downDelta = -1;
+        nextVote = null;
+      } else if (currentVote === "up") {
+        downDelta = 1;
+        upDelta = -1;
+        nextVote = "down";
+      } else {
+        downDelta = 1;
+        nextVote = "down";
+      }
     }
 
-    fetch(`/api/community/threads/${id}/upvote`, { method: 'POST' }).catch(() => {});
+    setUserVotes(prev => ({ ...prev, [id]: nextVote }));
+
+    // Update thread net score & check <= -10 Auto-Delete threshold
+    setThreads(prev => {
+      const updated = prev.map(t => {
+        if (t.id === id) {
+          const newUp = Math.max(0, (t.upvotes ?? 0) + upDelta);
+          const newDown = Math.max(0, (t.downvotes ?? 0) + downDelta);
+          return { ...t, upvotes: newUp, downvotes: newDown };
+        }
+        return t;
+      });
+
+      // Find if this post hit <= -10 net score
+      const target = updated.find(t => t.id === id);
+      if (target) {
+        const netScore = (target.upvotes ?? 0) - (target.downvotes ?? 0);
+        if (netScore <= -10) {
+          // Auto delete post!
+          const author = target.author;
+          const newStrikeCount = (userStrikes[author] ?? 0) + 1;
+          setUserStrikes(st => ({ ...st, [author]: newStrikeCount }));
+
+          // If strikes >= 3, enforce 24h cooldown
+          if (newStrikeCount >= 3) {
+            setUserCooldowns(cd => ({ ...cd, [author]: Date.now() + 24 * 60 * 60 * 1000 }));
+          }
+
+          if (selectedThread && selectedThread.id === id) {
+            setSelectedThread(null);
+          }
+
+          return updated.filter(t => t.id !== id);
+        }
+      }
+
+      return updated;
+    });
+
+    if (selectedThread && selectedThread.id === id) {
+      setSelectedThread(prev => {
+        if (!prev) return null;
+        const newUp = Math.max(0, (prev.upvotes ?? 0) + upDelta);
+        const newDown = Math.max(0, (prev.downvotes ?? 0) + downDelta);
+        if (newUp - newDown <= -10) return null;
+        return { ...prev, upvotes: newUp, downvotes: newDown };
+      });
+    }
+
+    fetch(`/api/community/threads/${id}/${direction === "up" ? "upvote" : "downvote"}`, { method: "POST" }).catch(() => {});
   };
 
-  // Delete Thread (Strictly Admin Only - zodiac.z408, Purges DB & LocalStorage)
+  // Check if current user is in 24h cooldown
+  const currentUserCooldownUntil = userCooldowns[currentUserHandle] ?? 0;
+  const isUserInCooldown = currentUserCooldownUntil > Date.now();
+  const currentStrikes = userStrikes[currentUserHandle] ?? 0;
+
+  // Delete Thread (Author or Admin zodiac.z408 only, Purges DB & LocalStorage)
   const handleDeleteThread = (threadId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (!isAdmin) return;
+    const thread = threads.find(t => t.id === threadId) || (selectedThread?.id === threadId ? selectedThread : null);
+    if (!thread || !canDeleteThread(thread)) return;
     playSound('click');
 
     setThreads(prev => {
@@ -234,12 +411,18 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
       setSelectedThread(null);
     }
 
-    fetch(`/api/community/threads/${threadId}`, { method: 'DELETE' }).catch(() => {});
+    fetch(`/api/community/threads/${threadId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: currentUserHandle })
+    }).catch(() => {});
   };
 
-  // Delete Comment (Strictly Admin Only - zodiac.z408)
+  // Delete Comment (Author or Admin zodiac.z408 only, Purges DB & LocalStorage)
   const handleDeleteComment = (commentId: string) => {
-    if (!isAdmin || !selectedThread) return;
+    if (!selectedThread) return;
+    const comment = selectedThread.comments.find(c => c.id === commentId);
+    if (!comment || !canDeleteComment(comment)) return;
     playSound('click');
     const updatedComments = selectedThread.comments.filter(c => c.id !== commentId);
     const newCount = Math.max(0, selectedThread.commentsCount - 1);
@@ -259,7 +442,11 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
 
     setSelectedThread(prev => prev ? { ...prev, commentsCount: newCount, comments: updatedComments } : null);
 
-    fetch(`/api/community/threads/${selectedThread.id}/comments/${commentId}`, { method: 'DELETE' }).catch(() => {});
+    fetch(`/api/community/threads/${selectedThread.id}/comments/${commentId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: currentUserHandle })
+    }).catch(() => {});
   };
 
   // Join Clan Logic
@@ -393,6 +580,18 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
     }).catch(() => {});
   };
 
+  const canDeleteThread = (t: { author: string }) => {
+    const authorNorm = (t.author || "").toLowerCase().replace(/^@/, "");
+    const userNorm = (currentUserHandle || "").toLowerCase().replace(/^@/, "");
+    return authorNorm === userNorm || userNorm === "zodiac.z408" || isAdmin;
+  };
+
+  const canDeleteComment = (c: { author: string }) => {
+    const authorNorm = (c.author || "").toLowerCase().replace(/^@/, "");
+    const userNorm = (currentUserHandle || "").toLowerCase().replace(/^@/, "");
+    return authorNorm === userNorm || userNorm === "zodiac.z408" || isAdmin;
+  };
+
   const trendingThread = useMemo(() => {
     if (threads.length === 0) return null;
     return [...threads].sort((a, b) => b.upvotes - a.upvotes)[0];
@@ -409,11 +608,11 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   }, [threads, selectedTag, searchQuery]);
 
   return (
-    <div className="w-full min-h-[calc(100vh-64px)] text-bb-ink relative pb-12">
-      <div className="w-full px-4 sm:px-8 py-8 relative z-10 max-w-7xl mx-auto">
+    <div className="w-full text-bb-ink relative">
+      <div className="w-full relative z-10 max-w-7xl mx-auto">
 
         {/* Hub Header & Navigation sub-tabs */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-bb-line pb-6 mb-6">
+        {showHeader && <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-bb-line pb-6 mb-6">
           <div>
             <Eyebrow number="04" className="mb-2">Community</Eyebrow>
             <h2 className="text-2xl md:text-3xl font-display font-extrabold tracking-tight text-bb-ink mb-2 mt-2">
@@ -453,7 +652,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
               </button>
             ))}
           </div>
-        </div>
+        </div>}
 
         {/* ═══ TAB CONTENT: DISCUSSIONS FORUM ═══ */}
         {activeSubTab === 'forum' && (
@@ -483,13 +682,19 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
 
                     <div className="flex items-center gap-2">
                       <Tag tone="neutral">{selectedThread.tag}</Tag>
-                      {isAdmin && (
+                      {canDeleteThread(selectedThread) && (
                         <button
                           onClick={() => handleDeleteThread(selectedThread.id)}
-                          className="px-2 py-1 rounded bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/30 text-[10px] font-mono transition-all cursor-pointer"
-                          title="Admin Delete Option (zodiac.z408)"
+                          className="flex items-center gap-1.5 px-3 py-1 rounded border border-bb-line-strong bg-bb-surface text-bb-ink-faint hover:text-bb-yellow hover:border-bb-yellow/60 hover:bg-bb-yellow/10 text-[10.5px] font-mono font-bold uppercase transition-all cursor-pointer shadow-xs"
+                          title="Delete Post (Author or Admin Only)"
                         >
-                          🗑️ Delete Post
+                          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            <line x1="10" y1="11" x2="10" y2="17" />
+                            <line x1="14" y1="11" x2="14" y2="17" />
+                          </svg>
+                          <span>Delete Post</span>
                         </button>
                       )}
                     </div>
@@ -527,63 +732,134 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                     )}
                   </div>
 
-                  {/* Upvote Bar */}
-                  <div className="flex items-center gap-4 border-b border-bb-line pb-5 mb-5">
-                    <button
-                      onClick={(e) => handleUpvote(selectedThread.id, e)}
-                      className="cursor-pointer"
-                    >
-                      <Tag tone="success" className="gap-2 px-3 py-1.5 text-xs">
-                        <span>👍 Upvote</span>
-                        <span className="font-bold text-bb-ink">{selectedThread.upvotes}</span>
-                      </Tag>
-                    </button>
-                    <span className="text-bb-ink-faint font-mono text-[10px]">
-                      {selectedThread.commentsCount} Comments
-                    </span>
-                  </div>
+                  {/* Codeforces Style Net-Score Vote Bar */}
+                  {(() => {
+                    const net = (selectedThread.upvotes ?? 0) - (selectedThread.downvotes ?? 0);
+                    const v = userVotes[selectedThread.id];
+                    return (
+                      <div className="flex items-center gap-4 border-b border-bb-line pb-5 mb-5 font-mono">
+                        <div className="flex items-center rounded-lg border border-bb-line-strong bg-bb-surface p-1 gap-1">
+                          {/* ▲ Up */}
+                          <button
+                            onClick={(e) => handleVote(selectedThread.id, "up", e)}
+                            className={`p-1.5 rounded transition-all cursor-pointer ${
+                              v === "up" ? "bg-bb-yellow text-bb-ground font-bold" : "text-bb-ink-faint hover:text-bb-yellow hover:bg-bb-surface-2"
+                            }`}
+                            title="Upvote (+1)"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 4l-8 8h6v8h4v-8h6z" />
+                            </svg>
+                          </button>
 
-                  {/* Comments list */}
-                  <div className="flex flex-col gap-4 mb-6">
-                    <Eyebrow tone="muted" className="mb-2">Community Responses</Eyebrow>
+                          {/* Net Score (+/-) */}
+                          <span className={`px-2 font-hud text-sm font-bold tabular-nums ${
+                            net > 0 ? "text-bb-yellow" : net < 0 ? "text-red-400" : "text-bb-ink-faint"
+                          }`}>
+                            {net > 0 ? `+${net}` : net}
+                          </span>
 
-                    {selectedThread.comments.length === 0 ? (
-                      <div className="py-4 text-center text-xs text-bb-ink-faint font-mono bg-bb-ground rounded border border-dashed border-bb-line">
-                        No responses yet. Share your thoughts or solution review!
+                          {/* ▼ Down */}
+                          <button
+                            onClick={(e) => handleVote(selectedThread.id, "down", e)}
+                            className={`p-1.5 rounded transition-all cursor-pointer ${
+                              v === "down" ? "bg-red-500 text-white font-bold" : "text-bb-ink-faint hover:text-red-400 hover:bg-bb-surface-2"
+                            }`}
+                            title="Downvote (-1, auto-delete at ≤ -10)"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 20l8-8h-6V4h-4v8H4z" />
+                            </svg>
+                          </button>
+                        </div>
+
+                        <span className="text-bb-ink-faint font-mono text-[11px] font-medium">
+                          {selectedThread.commentsCount} Comments
+                        </span>
+                        <span className="font-mono text-[9px] uppercase text-bb-ink-faint/60 ml-auto">
+                          Auto-purge threshold: ≤ -10
+                        </span>
                       </div>
-                    ) : (
-                      selectedThread.comments.map(c => (
-                        <Panel key={c.id} className="flex gap-3 items-start p-4 relative group/comment">
-                          <div className="w-8 h-8 rounded-full bg-bb-ink text-bb-ground flex items-center justify-center text-[10px] font-bold font-mono overflow-hidden shrink-0">
-                            {c.avatarUrl ? (
-                              <img src={c.avatarUrl} alt={c.author} className="w-full h-full object-cover rounded-full" />
-                            ) : (
-                              c.avatar
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-baseline justify-between">
-                              <span className="text-xs font-bold text-bb-ink font-mono">@{c.author}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[9px] text-bb-ink-faint font-mono">{c.date}</span>
-                                {isAdmin && (
-                                  <button
-                                    onClick={() => handleDeleteComment(c.id)}
-                                    className="text-red-400 hover:text-red-300 text-[10px] font-mono cursor-pointer transition-colors"
-                                    title="Admin Delete Comment"
-                                  >
-                                    🗑️
-                                  </button>
+                    );
+                  })()}
+
+                  {/* Comments list with Internal Scroll & Threaded Reply Action */}
+                  <div className="flex flex-col gap-2.5 mb-6">
+                    <div className="flex items-center justify-between">
+                      <Eyebrow tone="muted">Community Responses</Eyebrow>
+                      <span className="font-mono text-[10px] text-bb-ink-faint">
+                        {selectedThread.comments.length} responses
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl border border-bb-line-strong bg-bb-ground/50 p-3 min-h-[140px] max-h-[320px] overflow-y-auto custom-scrollbar flex flex-col gap-2.5">
+                      {selectedThread.comments.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-bb-ink-faint font-mono flex flex-col items-center justify-center gap-1">
+                          <span>No responses yet.</span>
+                          <span className="text-[10px] text-bb-yellow/80">Be the first to share your thoughts or solution breakdown!</span>
+                        </div>
+                      ) : (
+                        selectedThread.comments.map(c => {
+                          const isAuthorOfThread = c.author.toLowerCase() === selectedThread.author.toLowerCase();
+                          return (
+                            <Panel
+                              key={c.id}
+                              className={`flex gap-3 items-start p-3.5 relative transition-all border-bb-line-strong ${
+                                isAuthorOfThread ? "border-l-2 border-l-bb-yellow bg-bb-surface/90" : "bg-bb-surface/60"
+                              }`}
+                            >
+                              <div className="w-7 h-7 rounded-full bg-bb-ink text-bb-ground flex items-center justify-center text-[9.5px] font-bold font-mono overflow-hidden shrink-0">
+                                {c.avatarUrl ? (
+                                  <img src={c.avatarUrl} alt={c.author} className="w-full h-full object-cover rounded-full" />
+                                ) : (
+                                  c.avatar
                                 )}
                               </div>
-                            </div>
-                            <p className="text-xs text-bb-ink-soft mt-1 font-mono leading-relaxed whitespace-pre-wrap">
-                              {c.content}
-                            </p>
-                          </div>
-                        </Panel>
-                      ))
-                    )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-bb-ink font-mono">@{c.author}</span>
+                                    {isAuthorOfThread && (
+                                      <span className="px-1.5 py-0.2 text-[8.5px] font-mono font-bold uppercase rounded bg-bb-yellow/15 text-bb-yellow border border-bb-yellow/30">
+                                        Author
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2.5">
+                                    <span className="text-[9px] text-bb-ink-faint font-mono">{c.date}</span>
+                                    <button
+                                      onClick={() => {
+                                        playSound('click');
+                                        setCommentInput(prev => `@${c.author} ` + prev.replace(new RegExp(`^@${c.author}\\s*`), ''));
+                                      }}
+                                      className="text-bb-yellow hover:underline text-[9.5px] font-mono font-bold cursor-pointer transition-colors"
+                                      title={`Reply to @${c.author}`}
+                                    >
+                                      Reply
+                                    </button>
+                                    {canDeleteComment(c) && (
+                                      <button
+                                        onClick={() => handleDeleteComment(c.id)}
+                                        className="p-0.5 rounded text-bb-ink-faint hover:text-bb-yellow hover:bg-bb-yellow/10 transition-all cursor-pointer"
+                                        title="Delete Comment"
+                                      >
+                                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                          <polyline points="3 6 5 6 21 6" />
+                                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                                <p className="text-xs text-bb-ink-soft mt-1.5 font-mono leading-relaxed whitespace-pre-wrap">
+                                  {c.content}
+                                </p>
+                              </div>
+                            </Panel>
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
 
                   {/* Add comment editor */}
@@ -622,6 +898,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
 
                     {/* New Post Button */}
                     <Button
+                      id="community-create-post-btn"
                       variant="primary"
                       onClick={() => {
                         playSound('click');
@@ -632,8 +909,8 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                     </Button>
                   </div>
 
-                  {/* Thread Cards list */}
-                  <div className="flex flex-col gap-3">
+                  {/* Thread Cards list wrapped in an explicit Bento-style container box (~3 posts height with internal scroll) */}
+                  <div className="rounded-xl border-[1.5px] border-bb-line-strong bg-bb-surface/90 p-3.5 pt-3.5 min-h-[380px] max-h-[420px] overflow-y-auto custom-scrollbar flex flex-col gap-3">
                     {filteredThreads.length === 0 ? (
                       <div className="py-16 text-center text-xs text-bb-ink-faint font-mono rounded border border-dashed border-bb-line flex flex-col items-center justify-center gap-3">
                         <span>No community posts yet. Be the first to share a solution or OA question!</span>
@@ -679,13 +956,17 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                                   Posted by @{t.author} • {t.date}
                                 </span>
                               </div>
-                              {isAdmin && (
+                              {canDeleteThread(t) && (
                                 <button
                                   onClick={(e) => handleDeleteThread(t.id, e)}
-                                  className="text-red-400 hover:text-red-300 text-[11px] font-mono cursor-pointer transition-colors px-1.5 py-0.5 rounded hover:bg-red-500/10"
-                                  title="Admin Delete Post & Attached Media"
+                                  className="opacity-0 group-hover:opacity-100 flex items-center gap-1 p-1 px-2 rounded border border-bb-line-strong bg-bb-surface text-bb-ink-faint hover:text-bb-yellow hover:border-bb-yellow/60 hover:bg-bb-yellow/10 text-[9.5px] font-mono cursor-pointer transition-all"
+                                  title="Delete Post (Author / Admin)"
                                 >
-                                  🗑️
+                                  <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="3 6 5 6 21 6" />
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                  </svg>
+                                  <span>Delete</span>
                                 </button>
                               )}
                             </div>
@@ -705,18 +986,52 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                               </div>
                             )}
 
-                            <div className="flex items-center gap-4 mt-3 text-[10px] text-bb-ink-faint font-mono">
-                              <button
-                                onClick={(e) => handleUpvote(t.id, e)}
-                                className="flex items-center gap-1.5 hover:text-bb-success transition-colors group/up"
-                              >
-                                <span className="group-hover/up:scale-110 transition-transform">👍</span>
-                                <span className="font-bold">{t.upvotes}</span>
-                              </button>
+                            <div className="flex items-center gap-3.5 mt-3 text-[11px] text-bb-ink-faint font-mono flex-wrap">
+                              {/* CF Net-Score Control */}
+                              {(() => {
+                                const net = (t.upvotes ?? 0) - (t.downvotes ?? 0);
+                                const v = userVotes[t.id];
+                                return (
+                                  <div className="flex items-center rounded border border-bb-line-strong bg-bb-surface px-1 py-0.5 gap-1">
+                                    <button
+                                      onClick={(e) => handleVote(t.id, "up", e)}
+                                      className={`p-1 rounded transition-colors cursor-pointer ${
+                                        v === "up" ? "bg-bb-yellow text-bb-ground" : "text-bb-ink-faint hover:text-bb-yellow"
+                                      }`}
+                                      title="Upvote (+1)"
+                                    >
+                                      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 4l-8 8h6v8h4v-8h6z" />
+                                      </svg>
+                                    </button>
 
-                              <div className="flex items-center gap-1.5">
-                                <span>💬</span>
-                                <span className="font-bold">{t.commentsCount} Comments</span>
+                                    <span className={`px-1 font-hud text-xs font-bold tabular-nums ${
+                                      net > 0 ? "text-bb-yellow" : net < 0 ? "text-red-400" : "text-bb-ink-faint"
+                                    }`}>
+                                      {net > 0 ? `+${net}` : net}
+                                    </span>
+
+                                    <button
+                                      onClick={(e) => handleVote(t.id, "down", e)}
+                                      className={`p-1 rounded transition-colors cursor-pointer ${
+                                        v === "down" ? "bg-red-500 text-white" : "text-bb-ink-faint hover:text-red-400"
+                                      }`}
+                                      title="Downvote (-1)"
+                                    >
+                                      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 20l8-8h-6V4h-4v8H4z" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Comments count */}
+                              <div className="flex items-center gap-1.5 text-bb-ink-faint">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                </svg>
+                                <span>{t.commentsCount} Comments</span>
                               </div>
                             </div>
                           </div>
@@ -737,7 +1052,12 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className={`w-2 h-2 rounded-full shrink-0 ${TAG_ACCENT[trendingThread.tag]}`} />
                     <span className="text-[9px] uppercase tracking-wider text-bb-ink-faint">{trendingThread.tag}</span>
-                    <span className="text-[9px] text-bb-ink-faint ml-auto">👍 {trendingThread.upvotes}</span>
+                    <span className="text-[11px] text-bb-yellow ml-auto flex items-center gap-1 font-hud font-bold">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 4l-8 8h6v8h4v-8h6z" />
+                      </svg>
+                      {trendingThread.upvotes - (trendingThread.downvotes ?? 0) > 0 ? `+${trendingThread.upvotes - (trendingThread.downvotes ?? 0)}` : trendingThread.upvotes - (trendingThread.downvotes ?? 0)}
+                    </span>
                   </div>
                   <div className="text-sm font-display font-bold text-bb-ink mb-4 leading-snug line-clamp-2">
                     {trendingThread.title}
@@ -755,14 +1075,16 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                 </Panel>
               )}
 
-              <Panel className="p-5">
-                <div className="mb-3.5">
-                  <Eyebrow tone="muted">Topic Filter</Eyebrow>
-                  <Divider className="mt-2" />
+              {/* Topic Filter Panel (Sleek Scoreboard Brutalist View) */}
+              <Panel className="p-4 border-[1.5px] border-bb-line-strong bg-bb-surface/90">
+                <div className="flex items-center justify-between mb-3">
+                  <Eyebrow tone="muted">Topic Channels</Eyebrow>
+                  <span className="font-mono text-[9px] uppercase font-bold text-bb-ink-faint">15-Day Window</span>
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5">
                   {(['All', 'Solutions', 'Contest', 'General', 'Bugs'] as const).map(tag => {
                     const isSelected = selectedTag === tag;
+                    const count = tag === 'All' ? filteredThreads.length : threads.filter(t => t.tag === tag).length;
                     return (
                       <button
                         key={tag}
@@ -771,48 +1093,32 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                           setSelectedTag(tag);
                           setSelectedThread(null);
                         }}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded border text-left text-xs transition-colors cursor-pointer ${
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-left font-mono text-xs transition-all cursor-pointer ${
                           isSelected
-                            ? 'bg-bb-yellow-fill text-bb-yellow border-bb-yellow/30 font-bold'
-                            : 'border-transparent text-bb-ink-faint hover:text-bb-ink-soft hover:bg-bb-ink/[0.03]'
+                            ? 'bg-bb-yellow/10 text-bb-yellow border-bb-yellow/60 font-bold shadow-xs'
+                            : 'border-bb-line/50 text-bb-ink-soft hover:text-bb-ink hover:border-bb-line-strong hover:bg-bb-surface-2'
                         }`}
                       >
                         <span className="flex items-center gap-2">
-                          {tag !== 'All' && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${TAG_ACCENT[tag]}`} />}
-                          {tag === 'All' ? 'All Channels' : `# ${tag}`}
+                          {tag !== 'All' ? (
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${TAG_ACCENT[tag]}`} />
+                          ) : (
+                            <span className="w-2 h-2 rounded-full shrink-0 bg-bb-yellow" />
+                          )}
+                          <span className="truncate">{tag === 'All' ? 'All Channels' : `# ${tag}`}</span>
                         </span>
-                        {tag !== 'All' && (
-                          <Tag tone={isSelected ? 'accent' : 'neutral'}>
-                            {threads.filter(t => t.tag === tag).length}
-                          </Tag>
-                        )}
+                        <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border ${
+                          isSelected ? 'border-bb-yellow/50 bg-bb-yellow text-bb-ground font-extrabold' : 'border-bb-line bg-bb-ground/50 text-bb-ink-faint'
+                        }`}>
+                          {count}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
               </Panel>
 
-              {/* Guidelines panel */}
-              <Panel className="p-5 text-[10px] text-bb-ink-faint">
-                <div className="mb-3">
-                  <Eyebrow tone="muted">Community Rules</Eyebrow>
-                  <Divider className="mt-2" />
-                </div>
-                <ul className="flex flex-col gap-2.5 list-none pl-0 leading-relaxed">
-                  <li className="flex gap-2">
-                    <span className="text-bb-yellow">◼</span>
-                    <span>Post genuine C++ / DSA solution breakdowns & OA questions.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="text-bb-yellow">◼</span>
-                    <span>Attached images must be under 1MB in size.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="text-bb-yellow">◼</span>
-                    <span>Admin @zodiac.z408 moderates all community content.</span>
-                  </li>
-                </ul>
-              </Panel>
+
             </div>
 
           </div>
@@ -876,7 +1182,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                 <div>
                   <Eyebrow tone="muted">Community Clans Leaderboard</Eyebrow>
                 </div>
-                {isAdmin && (
+                {canDeleteComment(c) && (
                   <Button
                     variant="primary"
                     size="sm"
@@ -1013,15 +1319,27 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                 </div>
 
                 <div className="flex flex-col gap-4 text-xs">
+                  {/* User Cooldown Warning Banner */}
+                  {isUserInCooldown && (
+                    <div className="p-3 rounded-lg border border-red-500/50 bg-red-500/10 text-red-400 font-mono text-xs flex items-center gap-2">
+                      <span>⚠️</span>
+                      <span>Account on 24-Hour Cooldown (3 strikes reached due to posts ≤ -10 net score).</span>
+                    </div>
+                  )}
+
                   {/* Title */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-bb-ink-faint uppercase font-semibold">Post Title</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-bb-ink-faint uppercase font-semibold">Post Title</label>
+                      <span className="text-[10px] text-bb-ink-faint font-mono">{newTitle.length}/100</span>
+                    </div>
                     <input
                       type="text"
+                      maxLength={100}
                       value={newTitle}
                       onChange={e => setNewTitle(e.target.value)}
                       placeholder="E.g., Google OA: Max Subarray XOR Breakdown"
-                      className="h-10 px-3.5 bg-bb-ground border border-bb-line rounded text-bb-ink placeholder-bb-ink-faint focus:outline-none focus:border-bb-line-strong"
+                      className="h-10 px-3.5 bg-bb-ground border border-bb-line rounded text-bb-ink placeholder-bb-ink-faint focus:outline-none focus:border-bb-line-strong font-mono"
                     />
                   </div>
 
@@ -1031,20 +1349,20 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                     <select
                       value={newTag}
                       onChange={e => setNewTag(e.target.value as any)}
-                      className="h-10 px-3 bg-bb-ground border border-bb-line rounded text-bb-ink focus:outline-none focus:border-bb-line-strong"
+                      className="h-10 px-3 bg-bb-ground border border-bb-line rounded text-bb-ink focus:outline-none focus:border-bb-line-strong font-mono cursor-pointer"
                     >
-                      <option value="Solutions"># Solutions & OA Questions</option>
+                      <option value="Solutions"># Solutions &amp; OA Questions</option>
                       <option value="Contest"># Contest Strategy</option>
                       <option value="General"># General Discussion</option>
                       <option value="Bugs"># Bug Reports</option>
                     </select>
                   </div>
 
-                  {/* Image Attachment with <1MB constraint */}
+                  {/* Image Attachment with <= 50 KB constraint */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-bb-ink-faint uppercase font-semibold flex items-center justify-between">
-                      <span>Attach Image (Optional, Must be &lt; 1MB)</span>
-                      <span className="text-[10px] text-bb-yellow font-normal">Max size: 1MB</span>
+                      <span>Attach Image (Optional, Must be ≤ 50 KB)</span>
+                      <span className="text-[10px] text-bb-yellow font-normal">Max size: 50 KB</span>
                     </label>
                     <input
                       type="file"
@@ -1060,15 +1378,21 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                     {postImage && !imageError && (
                       <div className="mt-2 p-2 border border-bb-success/40 bg-bb-success/5 rounded flex items-center gap-3">
                         <img src={postImage} alt="Preview" className="h-12 w-12 object-cover rounded border border-bb-line" />
-                        <span className="text-[10px] text-bb-success font-mono">✓ Image attached successfully (&lt; 1MB)</span>
+                        <span className="text-[10px] text-bb-success font-mono">✓ Image attached successfully (≤ 50 KB)</span>
                       </div>
                     )}
                   </div>
 
                   {/* Code / Content */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-bb-ink-faint uppercase font-semibold">Post Content (C++ Code / Explanation)</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-bb-ink-faint uppercase font-semibold">Post Content (C++ Code / Explanation)</label>
+                      <span className={`text-[10px] font-mono ${newContent.length > 5000 ? "text-red-400 font-bold" : "text-bb-ink-faint"}`}>
+                        {(newContent.length / 1024).toFixed(1)} KB / 5.0 KB Max
+                      </span>
+                    </div>
                     <textarea
+                      maxLength={5000}
                       value={newContent}
                       onChange={e => setNewContent(e.target.value)}
                       placeholder="Share your C++ code solution, OA question breakdown, or discussion topic..."
@@ -1092,7 +1416,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                     <Button
                       variant="primary"
                       onClick={handleCreateThread}
-                      disabled={Boolean(imageError)}
+                      disabled={Boolean(imageError) || !newTitle.trim() || !newContent.trim() || newContent.length > 5000 || isUserInCooldown}
                     >
                       Publish Post
                     </Button>

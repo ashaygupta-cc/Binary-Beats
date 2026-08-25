@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import React, { useEffect, useState } from 'react';
+import { DISCORD_INVITE, PRIMARY_NAV } from '../data/site';
+import { navigate } from '../lib/router';
+import { Button } from './ui/Button';
 import { RatingBadge } from './ui/RatingBadge';
 import { Tag } from './ui/Tag';
-import { Button } from './ui/Button';
-import { PRIMARY_NAV, DISCORD_INVITE } from '../data/site';
-import { navigate } from '../lib/router';
 
 interface NavbarProps {
   /** Current route page id. */

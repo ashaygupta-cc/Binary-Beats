@@ -1,4 +1,6 @@
+import { SocialIcon } from './ui/SocialIcon';
 import { motion } from 'motion/react';
+import { SOCIAL_LINKS } from '../data/static';
 import { useEffect, useMemo, useState } from 'react';
 import { useCfHandle } from '../hooks/useCfHandle';
 import { computeStreak, countBySource, getRecent, getWeekActivity } from '../lib/activityLog';
@@ -155,22 +157,29 @@ export const HeroSection = ({ total, playSound, onNavigateTab }: HeroSectionProp
 
         <Divider orientation="vertical" className="hidden md:block" />
 
-        {/* Dataset Stats */}
+        {/* Community links */}
         <motion.div className="px-8 pt-6 md:pt-0" variants={{ hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0 } }}>
-          <Eyebrow tone="muted" className="mb-4">Database</Eyebrow>
-          <motion.div className="text-bb-ink" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-            <StatNumeral value={total || 12500} size="md" />
-          </motion.div>
-          <div className="text-[9px] font-mono text-bb-ink-faint uppercase tracking-wider mt-0.5 mb-4">Total Problems</div>
-          <div className="pt-4 border-t border-bb-line flex flex-col gap-2">
-            <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-bb-ink/60">Codeforces:</span>
-              <span className="font-bold text-bb-yellow">9,900+</span>
-            </div>
-            <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-bb-ink/60">LeetCode:</span>
-              <span className="font-bold text-cyan-400">2,600+</span>
-            </div>
+          <Eyebrow tone="muted" className="mb-4">Connect &amp; Community</Eyebrow>
+          <div className="flex flex-col gap-2 border-t border-bb-line pt-3 font-mono text-[11px]">
+            {SOCIAL_LINKS.map(({ label, url, platform }) => (
+              <a
+                key={platform}
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="group flex items-center justify-between gap-2 py-1 px-1.5 rounded transition-all text-bb-ink-soft hover:text-bb-yellow hover:bg-bb-surface"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-bb-yellow shrink-0 group-hover:scale-110 transition-transform">
+                    <SocialIcon platform={platform} className="w-3.5 h-3.5" />
+                  </span>
+                  <span className="font-bold uppercase tracking-wider truncate text-[10.5px]">
+                    {label}
+                  </span>
+                </div>
+                <span className="text-bb-ink-faint group-hover:text-bb-yellow text-[10px] transition-colors">↗</span>
+              </a>
+            ))}
           </div>
         </motion.div>
 

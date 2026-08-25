@@ -1,5 +1,7 @@
+import { SocialIcon } from "./ui/SocialIcon";
 import React from "react";
 import { PRIMARY_NAV, DISCORD_INVITE } from "../data/site";
+import { SOCIAL_LINKS } from "../data/static";
 import { navigate } from "../lib/router";
 import { Tag } from "./ui/Tag";
 
@@ -48,39 +50,24 @@ export const Footer: React.FC = () => (
 
       <div>
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-bb-ink-faint">
-          Community
+          Community &amp; Socials
         </p>
-        <ul className="mt-3 flex flex-col gap-2">
-          <li>
-            <a
-              href={DISCORD_INVITE}
-              target="_blank"
-              rel="noreferrer"
-              className="font-mono text-[13px] text-bb-ink-soft transition-colors hover:text-bb-yellow"
-            >
-              Discord server
-            </a>
-          </li>
-          <li>
-            <a
-              href="https://codeforces.com"
-              target="_blank"
-              rel="noreferrer"
-              className="font-mono text-[13px] text-bb-ink-soft transition-colors hover:text-bb-yellow"
-            >
-              Codeforces
-            </a>
-          </li>
-          <li>
-            <a
-              href="https://leetcode.com"
-              target="_blank"
-              rel="noreferrer"
-              className="font-mono text-[13px] text-bb-ink-soft transition-colors hover:text-bb-yellow"
-            >
-              LeetCode
-            </a>
-          </li>
+        <ul className="mt-3 flex flex-col gap-2.5">
+          {SOCIAL_LINKS.map((link) => (
+            <li key={link.platform}>
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noreferrer"
+                className="group font-mono text-[12.5px] text-bb-ink-soft transition-colors hover:text-bb-yellow flex items-center gap-2.5"
+              >
+                <span className="text-bb-yellow shrink-0 group-hover:scale-110 transition-transform">
+                  <SocialIcon platform={link.platform} className="w-3.5 h-3.5" />
+                </span>
+                <span className="font-medium">{link.label === "Discord" ? "Discord Server" : link.label}</span>
+              </a>
+            </li>
+          ))}
         </ul>
       </div>
     </div>

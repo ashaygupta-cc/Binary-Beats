@@ -1,3 +1,4 @@
+import { SocialIcon } from "../ui/SocialIcon";
 import React, { useState } from "react";
 import { ABOUT, SERVER_RULES, ENFORCEMENT_NOTE, SOCIAL_LINKS } from "../../data/static";
 import { DISCORD_INVITE } from "../../data/site";
@@ -169,11 +170,8 @@ export const AboutView: React.FC = () => {
                 lift
                 className="flex h-full cursor-pointer items-center gap-4 p-4 transition-colors"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded border-[1.5px] border-bb-line-strong bg-bb-surface-2 font-hud text-sm text-bb-yellow transition-colors group-hover:border-bb-yellow">
-                  {link.platform === "linkedin" && "in"}
-                  {link.platform === "youtube" && "▶"}
-                  {link.platform === "email" && "@"}
-                  {link.platform === "discord" && "⌘"}
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded border-[1.5px] border-bb-line-strong bg-bb-surface-2 text-bb-yellow transition-colors group-hover:border-bb-yellow group-hover:scale-105">
+                  <SocialIcon platform={link.platform} className="w-4 h-4" />
                 </span>
                 <div className="min-w-0">
                   <span className="font-display text-[14px] font-bold uppercase tracking-tight text-bb-ink">

@@ -138,6 +138,12 @@ export interface SocialLink {
 
 export const SOCIAL_LINKS: SocialLink[] = [
   {
+    label: "Discord",
+    url: DISCORD_INVITE,
+    platform: "discord",
+    description: "Join the community server — where everything happens.",
+  },
+  {
     label: "LinkedIn",
     url: "https://www.linkedin.com/company/binarybeatshq/",
     platform: "linkedin",
@@ -150,16 +156,16 @@ export const SOCIAL_LINKS: SocialLink[] = [
     description: "Arena walkthroughs, contest guides, and tutorials.",
   },
   {
+    label: "Twitter (X)",
+    url: "https://x.com/BinaryBeatsHQ",
+    platform: "twitter",
+    description: "Daily problems, contest alerts, and community announcements.",
+  },
+  {
     label: "Email",
     url: "mailto:binarybeats.community@gmail.com",
     platform: "email",
     description: "binarybeats.community@gmail.com",
-  },
-  {
-    label: "Discord",
-    url: DISCORD_INVITE,
-    platform: "discord",
-    description: "Join the community server — where everything happens.",
   },
 ];
 
