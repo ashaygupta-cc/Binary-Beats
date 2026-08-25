@@ -70,7 +70,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="font-display text-[17px] font-bold tracking-tight text-bb-ink">
               Binary Beats
             </span>
-            <Tag tone="neutral" bracket className="ml-0.5 hidden lg:inline-flex">C++17</Tag>
           </div>
 
           {/* Desktop nav */}

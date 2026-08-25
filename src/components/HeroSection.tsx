@@ -1,14 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
+import { useEffect, useMemo, useState } from 'react';
 import { useCfHandle } from '../hooks/useCfHandle';
+import { computeStreak, countBySource, getRecent, getWeekActivity } from '../lib/activityLog';
 import { fetchRatingHistory, type CfRatingChange } from '../lib/codeforces';
-import { computeStreak, getWeekActivity, getRecent, countBySource } from '../lib/activityLog';
-import { RatingBadge } from './ui/RatingBadge';
-import { Panel } from './ui/Panel';
-import { Eyebrow } from './ui/Eyebrow';
-import { StatNumeral } from './ui/StatNumeral';
 import { Button } from './ui/Button';
 import { Divider } from './ui/Divider';
+import { Eyebrow } from './ui/Eyebrow';
+import { RatingBadge } from './ui/RatingBadge';
+import { StatNumeral } from './ui/StatNumeral';
 
 interface HeroSectionProps {
   total: number;
@@ -63,7 +62,7 @@ export const HeroSection = ({ total, playSound, onNavigateTab }: HeroSectionProp
 
         <div className="flex items-center justify-center gap-2 mb-3">
           <span className="w-2.5 h-2.5 rounded-full bg-bb-yellow animate-pulse" />
-          <Eyebrow number="01">COMPETITIVE PROGRAMMING PLATFORM</Eyebrow>
+          <Eyebrow number="01">COMPETITIVE PROGRAMMING</Eyebrow>
           <span className="w-2.5 h-2.5 rounded-full bg-bb-yellow animate-pulse" />
         </div>
 
@@ -72,7 +71,7 @@ export const HeroSection = ({ total, playSound, onNavigateTab }: HeroSectionProp
         </h1>
 
         <p className="text-base sm:text-lg text-bb-yellow font-bold mt-3 font-mono max-w-xl mx-auto text-center tracking-wide">
-          Code. Compete. Conquer.
+          CODE. COMPETE. CONQUER.
         </p>
 
         <div className="mt-5 flex items-center justify-center gap-3 flex-wrap">
